@@ -94,12 +94,12 @@ const BEST=[/svetlana.*(natural|online)|dariya.*(natural|online)/i,/natural|neur
 const ruV=()=>{try{return syn.getVoices().filter(x=>/^ru/i.test(x.lang))}catch(e){return []}};
 const rk=v=>{const i=BEST.findIndex(r=>r.test(v.name));return i<0?99:i};
 function voice(){const v=ruV();if(!v.length)return null;return (store.v&&v.find(x=>x.name===store.v))||v.slice().sort((a,b)=>rk(a)-rk(b))[0]}
-const soft=p=>Math.min(1.45,Math.max(.72,p));
+const soft=p=>Math.min(1.22,Math.max(.88,1+(p-1)*.45));
 function say(txt,name,done){const g=gen;let fin=false;const go=()=>{if(fin)return;fin=true;setMus(1);done&&done()};
  const rd=900+txt.length*62;
  if(muted||!syn||!voice()){later(go,rd);return}
  try{syn.cancel();const parts=txt.match(/[^.!?…]+[.!?…»]*/g)||[txt],v=voice();
-  parts.forEach((p,i)=>{const u=new SpeechSynthesisUtterance(p.trim());u.lang='ru-RU';u.rate=name==='Рассказчик'?.8:.84;u.pitch=soft(PITCH[name]||1.1);u.volume=1;u.voice=v;u.onstart=()=>setMus(.28);if(i===parts.length-1)u.onend=go;u.onerror=()=>{if(g===gen)later(go,rd)};syn.speak(u)});later(go,txt.length*190+4200)}catch(e){later(go,rd)}}
+  parts.forEach((p,i)=>{const u=new SpeechSynthesisUtterance(p.trim());u.lang='ru-RU';u.rate=name==='Рассказчик'?.9:.94;u.pitch=soft(PITCH[name]||1.1);u.volume=1;u.voice=v;u.onstart=()=>setMus(.28);if(i===parts.length-1)u.onend=go;u.onerror=()=>{if(g===gen)later(go,rd)};syn.speak(u)});later(go,txt.length*190+4200)}catch(e){later(go,rd)}}
 function ctx(){ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();return ac}
 function tone(f,t0,d,v){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.connect(g);g.connect(ac.destination);g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(v,t0+.015);g.gain.exponentialRampToValueAtTime(.0001,t0+d);o.start(t0);o.stop(t0+d+.02)}
 function tune(a,st){if(muted)return;try{ctx();const n=ac.currentTime+.02;a.forEach((f,i)=>tone(f,n+i*st,.7,.14))}catch(e){}}
