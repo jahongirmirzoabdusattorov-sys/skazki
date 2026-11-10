@@ -118,11 +118,11 @@ const save=()=>{try{localStorage.setItem('llh-skazki-v1',JSON.stringify(store))}
 /* access: first FREE tales are open to everyone; the rest need a course code */
 const FREE=1;
 const KEYS=['e14b2f1053dde17b09bdc1459576632d13d4774defedb56dfe69be46ac9aa893'];
-let full=KEYS.includes(store._key);
+let full=(()=>{try{return KEYS.includes(localStorage.getItem('llh-key'))||KEYS.includes(store._key)}catch(e){return false}})();
 const isLocked=t=>!full&&D.indexOf(t)>=FREE;
 const normCode=s=>String(s||'').toUpperCase().replace(/[^0-9A-ZА-ЯЁ]/g,'');
 async function hashCode(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('llh:'+normCode(s)));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-async function tryCode(s){if(!normCode(s))return false;const h=await hashCode(s);if(!KEYS.includes(h))return false;full=true;store._key=h;save();return true}
+async function tryCode(s){if(!normCode(s))return false;const h=await hashCode(s);if(!KEYS.includes(h))return false;full=true;store._key=h;save();try{localStorage.setItem('llh-key',h)}catch(e){}return true}
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const later=(f,t)=>{timers.push(setTimeout(f,t))};
 const clearT=()=>{timers.forEach(clearTimeout);timers=[]};
