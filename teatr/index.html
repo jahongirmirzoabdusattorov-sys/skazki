@@ -81,6 +81,7 @@ h2{font-size:21px;font-weight:900;margin:16px 0 2px}.sub{color:var(--mut);font-s
 .po{position:relative}.po.lock img{filter:grayscale(1);opacity:.45}.po.lock b{color:var(--mut)}.po small{display:block;font-size:14px;font-weight:700;color:var(--mut);margin-top:3px}
 .lk{position:absolute;z-index:2;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:var(--gold);display:grid;place-items:center}
 .lk svg,.lkb svg{width:19px;height:19px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.steps{display:grid;gap:8px;margin:8px 0 6px;text-align:left}.st{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid var(--line);border-radius:14px;padding:9px 12px;font-size:15px}.st i{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:15px;flex:none}.st.on{border-color:#4caf6d;background:#eef8f1}.st.on i{background:#4caf6d;border-color:#4caf6d;color:#fff}.pg .ok{color:#3a9a5b}
 .pro{background:#fff8e1;border:2px solid var(--gold);border-radius:20px;padding:14px 16px;margin-top:14px;text-align:center}
 .pro b{display:block;font-size:19px;font-weight:900;line-height:1.2}.pro small{display:block;font-size:14px;font-weight:700;color:var(--mut);margin:3px 0 4px}
 .lkb{width:72px;height:72px;border-radius:50%;background:var(--gold);display:grid;place-items:center;margin:10px auto 8px}.lkb svg{width:34px;height:34px}
@@ -103,6 +104,12 @@ IC.lock='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="
 const FREE=1,KEYS=['e14b2f1053dde17b09bdc1459576632d13d4774defedb56dfe69be46ac9aa893'];
 let full=(()=>{try{return KEYS.includes(localStorage.getItem('llh-key'))}catch(e){return false}})();
 const isLocked=x=>!full&&T.indexOf(x)>=FREE;
+const prog=x=>((store.p||{})[x.k])||{};
+const learned=x=>{const p=prog(x);return !!(p.w&&p.r)};
+const seqLocked=x=>{const i=T.indexOf(x);return i>0&&!store.all&&!learned(T[i-1])};
+function mark(x,f){store.p=store.p||{};const p=store.p[x.k]=store.p[x.k]||{};const was=learned(x);p[f]=1;save();return !was&&learned(x)}
+const ck=(on,t)=>`<div class="st${on?' on':''}"><i>${on?'✓':''}</i>${t}</div>`;
+const steps=x=>{const p=prog(x);return `<div class="steps">${ck(p.w,'Спектаклни охиригача кўр · Посмотри спектакль')}${ck(p.r,'Битта ролни ўйна · Сыграй роль')}</div>`};
 const normCode=s=>String(s||'').toUpperCase().replace(/[^0-9A-ZА-ЯЁ]/g,'');
 async function hashCode(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('llh:'+normCode(s)));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function tryCode(s){if(!normCode(s))return false;const h=await hashCode(s);if(!KEYS.includes(h))return false;full=true;try{localStorage.setItem('llh-key',h)}catch(e){}return true}
@@ -139,11 +146,17 @@ const stop=()=>{gen++;clear();try{syn.cancel()}catch(e){}};
 function bar(ti){return `<div class="top"><button class="ic" id="bk" aria-label="Назад">${IC.b}</button><div class="ttl">${ti}</div><button class="ic" id="mt" aria-label="Звук">${muted?IC.o:IC.s}</button></div>`}
 function wire(b){E('bk').onclick=()=>{stop();b()};E('mt').onclick=()=>{muted=!muted;E('mt').innerHTML=muted?IC.o:IC.s;setMus(1);if(muted)try{syn.cancel()}catch(e){}}}
 function home(){stop();stopMusic();fs(false);
- A.innerHTML=`<div class="hero"><h1>Кукольный театр</h1><p>Выбери сказку · Эртакни танла</p></div><div class="gr">${T.map((x,i)=>isLocked(x)?`<button class="po lock" data-i="${i}" aria-label="${x.n} — закрыто"><span class="lk">${IC.lock}</span><img src="${IM[x.c]}" alt=""><b>${x.n}</b><small>Курс ўқувчилари учун</small></button>`:`<button class="po" data-i="${i}"><img src="${IM[x.c]}" alt=""><b>${x.n}</b></button>`).join('')}</div>${full?'':`<div class="pro"><b>Барча ${T.length} спектакль — курс ўқувчилари учун</b><small>Все ${T.length} спектаклей — для учеников Leadership Learning House</small><button class="big" id="key" style="margin-bottom:0;font-size:20px">Кодни киритиш · Ввести код</button></div>`}<button class="chip" id="vc">Овозни танлаш</button><div id="vl"></div><p class="note" id="nt"></p>`;
+ A.innerHTML=`<div class="hero"><h1>Кукольный театр</h1><p>Выбери сказку · Эртакни танла</p></div><div class="gr">${T.map((x,i)=>isLocked(x)?`<button class="po lock" data-i="${i}" aria-label="${x.n} — закрыто"><span class="lk">${IC.lock}</span><img src="${IM[x.c]}" alt=""><b>${x.n}</b><small>Курс ўқувчилари учун</small></button>`:(seqLocked(x)?`<button class="po lock" data-i="${i}" aria-label="${x.n} — закрыто"><span class="lk">${IC.lock}</span><img src="${IM[x.c]}" alt=""><b>${x.n}</b><small>Аввал «${T[i-1].n}»</small></button>`:`<button class="po" data-i="${i}"><img src="${IM[x.c]}" alt=""><b>${x.n}</b><small class="pg">${learned(x)?'<span class="ok">★ Ўрганилди</span>':(prog(x).w||prog(x).r?'½ Давом эт':'Янги')}</small></button>`)).join('')}</div>${full?'':`<div class="pro"><b>Барча ${T.length} спектакль — курс ўқувчилари учун</b><small>Все ${T.length} спектаклей — для учеников Leadership Learning House</small><button class="big" id="key" style="margin-bottom:0;font-size:20px">Кодни киритиш · Ввести код</button></div>`}<button class="chip" id="vc">Овозни танлаш</button><div id="vl"></div><p class="note" id="nt"></p>`;
  document.querySelectorAll('.po').forEach(b=>b.onclick=()=>tale(T[+b.dataset.i]));
  if(E('key'))E('key').onclick=()=>gate(null);
  E('vc').onclick=()=>{const l=E('vl'),v=ruV();if(l.innerHTML){l.innerHTML='';return}l.innerHTML=v.length?v.map((x,i)=>`<button class="vo${voice().name===x.name?' on':''}" data-i="${i}">${esc(x.name)}</button>`).join(''):'<p class="note">Бу қурилмада рус овози топилмади.</p>';l.querySelectorAll('.vo').forEach(b=>b.onclick=()=>{store.v=v[+b.dataset.i].name;save();l.querySelectorAll('.vo').forEach(y=>y.classList.remove('on'));b.classList.add('on');say('Здравствуйте! Начинаем сказку.','Рассказчик')})};
  const c=()=>{const n=E('nt');if(n&&(!syn||!voice()))n.textContent='Овоз чиқмаса, матн экранда кўринади: ўқитувчи ўқиб беради.'};c();later(c,1200);
+}
+function wait(x){stop();stopMusic();fs(false);const pv=T[T.indexOf(x)-1];
+ A.innerHTML=bar(x.n)+`<div class="po lock" style="padding:14px"><img src="${IM[x.c]}" alt="" style="height:130px"></div><div class="gate"><div class="lkb">${IC.lock}</div><h2>Аввал «${pv.n}» эртагини ўрган</h2><p>Сначала выучи сказку «${pv.n}» — и «${x.n}» откроется!</p>${steps(pv)}<button class="big" id="pv">«${pv.n}» га ўтиш</button><button class="chip" id="tc">Ўқитувчи учун · Для учителя</button><div id="tz"></div></div>`;
+ wire(home);E('pv').onclick=()=>tale(pv);
+ E('tc').onclick=()=>{const z=E('tz');if(z.innerHTML){z.innerHTML='';return}z.innerHTML=`<p class="sub" style="margin-top:12px">Курс коди билан барча эртакларни тартибсиз очиш · Открыть все сказки кодом курса</p><input class="code" id="tcd" type="text" inputmode="numeric" autocomplete="off" placeholder="••••••" aria-label="Код учителя"><button class="bt" id="tok" style="width:100%">Очиш · Открыть</button><div class="gm" id="tgm"></div>`;
+  E('tok').onclick=async()=>{let g=false;try{g=await tryCode(E('tcd').value)}catch(e){}if(g){store.all=1;save();tune([523,659,784,1047],.12);tale(x)}else{E('tgm').textContent='Код нотўғри · Неверный код'}}};
 }
 function gate(x){stop();stopMusic();fs(false);
  A.innerHTML=bar(x?x.n:'Полный доступ')+(x?`<div class="po lock" style="padding:14px"><img src="${IM[x.c]}" alt="" style="height:130px"></div>`:'')+
@@ -157,8 +170,8 @@ function gate(x){stop();stopMusic();fs(false);
   else{ok.disabled=false;inp.classList.remove('bad');void inp.offsetWidth;inp.classList.add('bad');tune([392,349],.13);E('gm').textContent='Код нотўғри · Неверный код';inp.select()}};
  ok.onclick=sub;inp.onkeydown=e=>{if(e.key==='Enter')sub()};
 }
-function tale(x){if(isLocked(x))return gate(x);stop();stopMusic();fs(false);t=x;const hs=Object.keys(x.m).filter(n=>x.m[n]);
- A.innerHTML=bar(x.n)+`<div class="po" style="padding:14px"><img src="${IM[x.c]}" alt="" style="height:130px"></div><button class="big" id="go">Смотреть спектакль</button><p class="sub" style="text-align:center">Қўғирчоқлар ўзи ўйнаб беради</p><h2>Я играю!</h2><p class="sub">Қаҳрамонни танла: унинг гапларини ўзинг айтасан</p><div class="rl">${hs.map(n=>`<button class="ro" data-n="${n}"><img src="${IM[x.m[n]]}" alt="">${n}</button>`).join('')}</div>`;
+function tale(x){if(isLocked(x))return gate(x);if(seqLocked(x))return wait(x);stop();stopMusic();fs(false);t=x;const hs=Object.keys(x.m).filter(n=>x.m[n]);
+ A.innerHTML=bar(x.n)+`<div class="po" style="padding:14px"><img src="${IM[x.c]}" alt="" style="height:130px"></div><button class="big" id="go">Смотреть спектакль</button><p class="sub" style="text-align:center">Қўғирчоқлар ўзи ўйнаб беради</p>${T.indexOf(x)<T.length-1?`<p class="sub" style="text-align:center;margin-top:14px">Кейинги эртак очилиши учун · Чтобы открыть следующую сказку:</p>${steps(x)}`:""}<h2>Я играю!</h2><p class="sub">Қаҳрамонни танла: унинг гапларини ўзинг айтасан</p><div class="rl">${hs.map(n=>`<button class="ro" data-n="${n}"><img src="${IM[x.m[n]]}" alt="">${n}</button>`).join('')}</div>`;
  wire(home);const unlock=()=>{fs(true);try{ctx();if(syn&&!muted){const u=new SpeechSynthesisUtterance(' ');u.volume=0;syn.speak(u)}}catch(e){}};
  E('go').onclick=()=>{unlock();role=null;show()};document.querySelectorAll('.ro').forEach(b=>b.onclick=()=>{unlock();role=b.dataset.n;show()});
 }
@@ -199,7 +212,7 @@ function line(l){const[n,tx]=l,g=gen;E('st').classList.add('op');let names=[],gr
   E('hp').onclick=()=>say(tx,n);E('dn').onclick=()=>{playing=true;E('pl').innerHTML=IC.h;next()};return}
  say(tx,n,()=>{if(g===gen&&playing)later(()=>{if(g===gen&&playing)next()},380)});
 }
-function end(){stop();talk([]);E('st').classList.remove('op');E('ti').textContent='';later(()=>{E('br').style.display='grid';clap();tune([523,659,784,1047,784,1047,1319],.15);E('tx').textContent='Спасибо! До новых встреч!';E('nm').textContent='';E('av').className='av0';E('pa').className='';E('tb').innerHTML='<div class="tb"><button class="bt alt" id="ag">Ещё раз</button><button class="bt" id="ho">К сказкам</button></div>';E('ag').onclick=show;E('ho').onclick=home;for(let i=0;i<40;i++){const c=document.createElement('i');c.className='cf';c.style.left=Math.random()*100+'vw';c.style.background=['#f7c548','#2bb0ba','#ec7a62','#4caf6d'][i%4];c.style.animationDelay=Math.random()*.9+'s';document.body.appendChild(c);setTimeout(()=>c.remove(),3500)}},800)}
+function end(){const nu=mark(t,role?'r':'w');const ni=T.indexOf(t)+1;stop();talk([]);E('st').classList.remove('op');E('ti').textContent='';later(()=>{E('br').style.display='grid';clap();tune([523,659,784,1047,784,1047,1319],.15);E('tx').textContent='Спасибо! До новых встреч!';E('nm').textContent='';E('av').className='av0';E('pa').className='';E('tb').innerHTML='<div class="tb"><button class="bt alt" id="ag">Ещё раз</button><button class="bt" id="ho">К сказкам</button></div>';E('ag').onclick=show;E('ho').onclick=home;if(nu&&ni<T.length&&!isLocked(T[ni]))E('tx').textContent=`Молодец! Сказка «${T[ni].n}» открыта! · «${T[ni].n}» очилди!`;else if(!learned(t)&&ni<T.length)E('tx').textContent=role?'Ажойиб! Энди спектаклни охиригача кўр.':'Ажойиб! Энди битта ролни ўзинг ўйна.';for(let i=0;i<40;i++){const c=document.createElement('i');c.className='cf';c.style.left=Math.random()*100+'vw';c.style.background=['#f7c548','#2bb0ba','#ec7a62','#4caf6d'][i%4];c.style.animationDelay=Math.random()*.9+'s';document.body.appendChild(c);setTimeout(()=>c.remove(),3500)}},800)}
 try{syn&&syn.getVoices()}catch(e){}
 function route(){const h=location.hash.slice(1),x=T.find(q=>q.k===h);x?tale(x):home()}
 window.addEventListener('hashchange',route);route();
