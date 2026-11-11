@@ -685,7 +685,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const SITE=true,FREE=1;
 const KEYS=['e14b2f1053dde17b09bdc1459576632d13d4774defedb56dfe69be46ac9aa893'];
 let full=true;
-const isLocked=mi=>!full&&mi>=FREE;
+const isLocked=mi=>mi>0&&!S.all&&(S.tests[mi-1]||0)<7;
 const normCode=s=>String(s||'').toUpperCase().replace(/[^0-9A-ZА-ЯЁ]/g,'');
 async function hashCode(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('llh:'+normCode(s)));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function tryCode(s){if(!normCode(s))return false;const h=await hashCode(s);if(!KEYS.includes(h))return false;full=true;S._key=h;save();try{localStorage.setItem('llh-key',h)}catch(e){}return true}
@@ -782,7 +782,7 @@ function openHome(){go();
 function openMap(){go();
  app.innerHTML=`<div class="bar"><button class="ib" id="home" aria-label="Домой">🏠</button><div class="btitle">Карта года</div>${sndBtn()}</div>
  <div class="mapinfo"><img src="${HEAD}" alt=""><div><b>Выбери месяц!</b><span>★ ${totalStars()} · ⭐ ${monthStars()} из 12</span></div></div>
- <div class="map">${DATA.map((m,i)=>isLocked(i)?`<button class="mt lk" data-m="${i}" style="--c:${m.color}"><span class="mn">${i+1}</span><span class="mtt">${esc(m.title)}</span><span class="lkt">🔒 Курс ўқувчилари учун</span></button>`:`<button class="mt" data-m="${i}" style="--c:${m.color}"><span class="mn">${i+1}</span><span class="mtt">${esc(m.title)}</span><span class="md">${m.lessons.map((l,li)=>`<i class="${(S.stars[i+'-'+li]||0)>0?'on':''}"></i>`).join('')}</span>${(S.tests[i]||0)>=7?'<span class="mstar">⭐</span>':''}</button>`).join('')}</div>
+ <div class="map">${DATA.map((m,i)=>isLocked(i)?`<button class="mt lk" data-m="${i}" style="--c:${m.color}"><span class="mn">${i+1}</span><span class="mtt">${esc(m.title)}</span><span class="lkt">🔒 Аввал ${i}-ой тести</span></button>`:`<button class="mt" data-m="${i}" style="--c:${m.color}"><span class="mn">${i+1}</span><span class="mtt">${esc(m.title)}</span><span class="md">${m.lessons.map((l,li)=>`<i class="${(S.stars[i+'-'+li]||0)>0?'on':''}"></i>`).join('')}</span>${(S.tests[i]||0)>=7?'<span class="mstar">⭐</span>':''}</button>`).join('')}</div>
  ${full?'':`<div class="pcard" style="text-align:center"><b>Барча 12 ой — курс ўқувчилари учун</b><br><small style="font-weight:700;color:#6B8287">Все 12 месяцев — для учеников Leadership Learning House</small><div class="row" style="margin-top:12px"><button class="btn" id="key">Кодни киритиш · Ввести код</button></div></div>`}
  <div class="row"><button class="btn y" id="stars">⭐ Мои звёздочки</button><button class="btn w" id="par">Для родителей</button></div>`;
  const kb=$('#key');if(kb)kb.onclick=()=>openGate(null);
@@ -1040,7 +1040,15 @@ function openParents(){go();
  $('#reset').onclick=()=>ask('Стереть все звёзды?','Стереть','Отмена',()=>{S.stars={};S.tests={};S.oly=null;save();openParents()});
 }
 
-function openGate(mi){go();
+function openGate(mi){go();if(mi!=null){const b=S.tests[mi-1]||0;
+ app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Назад">←</button><div class="btitle">Месяц ${mi+1}</div>${sndBtn()}</div>
+ <div class="lock"><div style="font-size:54px;line-height:1">🔒</div><h2 style="font-size:24px;font-weight:900;color:#1F8A97;margin-top:6px">Аввал ${mi}-ой тестини топшир</h2>
+ <p style="font-size:15px;color:#4B6B71;margin:8px 0 14px">${mi}-ой тестидан 10 тадан камида 7 та тўғри жавоб — ва ${mi+1}-ой очилади!<br>Сдай тест ${mi}-го месяца хотя бы на 7 из 10 — и откроется месяц ${mi+1}.${b?`<br><br>Сенинг натижанг · Твой результат: <b>${b} из 10</b>`:''}</p>
+ <div class="row"><button class="btn" id="pvm">${mi}-ой · Месяц ${mi}</button></div><div class="row"><button class="btn w" id="tch">Ўқитувчи учун · Для учителя</button></div><div id="tz"></div></div>`;
+ $('#back').onclick=openMap;bindSnd();$('#pvm').onclick=()=>openMonth(mi-1);
+ $('#tch').onclick=()=>{const z=$('#tz');if(z.innerHTML){z.innerHTML='';return}z.innerHTML=`<p style="font-size:14px;color:#6B8287;margin:12px 0 6px">Курс коди билан барча ойларни очиш · Открыть все месяцы кодом курса</p><input class="inp code" id="tcd" type="text" inputmode="numeric" autocomplete="off" placeholder="••••••" aria-label="Код учителя"><div class="row"><button class="btn" id="tok">Очиш · Открыть</button></div><div class="msg" id="tgm"></div>`;
+  $('#tok').onclick=async()=>{let g=false;try{g=await tryCode($('#tcd').value)}catch(e){}if(g){S.all=1;save();openMonth(mi)}else $('#tgm').textContent='Код нотўғри · Неверный код'}};
+ return}
  app.innerHTML=`<div class="bar"><button class="ib" id="back" aria-label="Назад">←</button><div class="btitle">${mi!=null?'Месяц '+(mi+1):'Полный доступ'}</div>${sndBtn()}</div>
  <div class="lock"><div style="font-size:54px;line-height:1">🔒</div><h2 style="font-size:24px;font-weight:900;color:#1F8A97;margin-top:6px">Курс ўқувчилари учун</h2>
  <p style="font-size:15px;color:#4B6B71;margin:8px 0 14px">Ҳозир 1-ой ҳамма учун очиқ. Барча 12 ой — Leadership Learning House ўқувчилари учун. Кодни ўқитувчингиздан олинг.<br><br>Сейчас бесплатно открыт 1-й месяц. Все 12 месяцев — для учеников курса. Код выдаёт учитель.</p>
