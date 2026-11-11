@@ -118,7 +118,7 @@ const save=()=>{try{localStorage.setItem('llh-skazki-v1',JSON.stringify(store))}
 /* access: first FREE tales are open to everyone; the rest need a course code */
 const FREE=1;
 const KEYS=['e14b2f1053dde17b09bdc1459576632d13d4774defedb56dfe69be46ac9aa893'];
-let full=(()=>{try{return KEYS.includes(localStorage.getItem('llh-key'))||KEYS.includes(store._key)}catch(e){return false}})();
+let full=true;
 const isLocked=t=>!full&&D.indexOf(t)>=FREE;
 const normCode=s=>String(s||'').toUpperCase().replace(/[^0-9A-ZА-ЯЁ]/g,'');
 async function hashCode(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('llh:'+normCode(s)));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}

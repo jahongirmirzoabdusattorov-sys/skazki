@@ -102,7 +102,7 @@ let muted=false,t,sc=0,ln=-1,playing=true,role=null,gen=0,cast=[],tm=[],ac;
 /* access: first FREE tales open to everyone; the rest need the course code (shared with the games page) */
 IC.lock='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>';
 const FREE=1,KEYS=['e14b2f1053dde17b09bdc1459576632d13d4774defedb56dfe69be46ac9aa893'];
-let full=(()=>{try{return KEYS.includes(localStorage.getItem('llh-key'))}catch(e){return false}})();
+let full=true;
 const isLocked=x=>!full&&T.indexOf(x)>=FREE;
 const prog=x=>((store.p||{})[x.k])||{};
 const learned=x=>{const p=prog(x);return !!(p.w&&p.r)};
