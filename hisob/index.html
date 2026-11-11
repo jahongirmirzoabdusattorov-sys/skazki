@@ -21,6 +21,7 @@
   --bg:#0F1A1D;--card:#182629;--ink:#E7EEEE;--mute:#9BADB0;--line:#2B3C40;--accent:#5CC0D4;--on:#08262D;
   --good:#6FD39E;--goodbg:#143325;--warn:#EBC069;--warnbg:#3A2C0C;--bad:#F39A93;--badbg:#401C1A;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.4 var(--font);padding-bottom:84px;font-variant-numeric:tabular-nums}
 main{max-width:640px;margin:0 auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px}
@@ -374,12 +375,14 @@ async function del(col,id){
 }
 function toast(t){const e=document.getElementById("toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",3500)}
 
+/* Rol: rahbar (egasi) hammasini ko'radi; xodim kundalik ish qiladi */
+function own(){return !!(window.AUTH&&AUTH.role==="owner")}
 /* Kirgandan keyin Firebase moduli shu funksiyani chaqiradi */
-function init(api){
-  db=api;
-  const pending=new Set(Object.keys(S));
+function init(api,cols){
+  db=api;cols=cols||Object.keys(S);
+  const pending=new Set(cols);
   const timer=setTimeout(()=>{if(!loaded){loaded=true;render();toast("Ma'lumotlarga ulanib bo'lmadi. Internetni tekshiring.")}},10000);
-  for(const col of Object.keys(S)){
+  for(const col of cols){
     db.collection(col).onSnapshot(snap=>{
       const o={};snap.docs.forEach(d=>o[d.id]=d.data());S[col]=o;pending.delete(col);
       if(!pending.size){clearTimeout(timer);loaded=true}
@@ -395,11 +398,13 @@ function init(api){
 function doLogin(e){if(e)e.preventDefault();return false}
 
 /* ---- Ekranlar ---- */
-function go(v){view=v;render();window.scrollTo(0,0)}
+function go(v){if(!own()&&(v==="tch"||v==="rep"))return;view=v;render();window.scrollTo(0,0)}
 function monthBar(){return `<div class="month"><button class="icon" aria-label="Oldingi oy" onclick="month=shift(month,-1);render()">‹</button><h1>${mName(month)}</h1><button class="icon" aria-label="Keyingi oy" onclick="month=shift(month,1);render()">›</button></div>`}
 function render(){
   C={};
   for(const t of["pay","led","att","grp","stu","tch"])document.getElementById("t-"+t).classList.toggle("on",view===t);
+  document.getElementById("t-tch").hidden=!own();
+  if(!own()&&(view==="tch"||view==="rep"))view="pay";
   if(!loaded)return;
   const a=document.getElementById("app");
   a.innerHTML=(view==="pay"?payView():view==="rep"?repView():view==="led"?leadView():view==="att"?attView():view==="grp"?grpView():view==="tch"?tchView():stuView());
@@ -411,10 +416,10 @@ function payView(){
   const opts=Object.entries(S.groups).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,g])=>`<option value="${id}" ${F.g===id?"selected":""}>${esc(g.name)}</option>`).join("");
   const seg=[["all","Hammasi"],["debt","Qarzdorlar"],["paid","To'laganlar"]].map(([k,l])=>`<button class="${F.st===k?"on":""}" onclick="F.st='${k}';render()">${l}</button>`).join("");
   return monthBar()+`<section class="sum"><div><div class="lbl">Qolgan qarz</div><div class="big ${left?"":"ok"}">${money(left)} so'm</div></div>
-  <div class="bar"><i style="width:${pct}%"></i></div>
-  <div class="two"><div><div class="lbl">Hisoblangan</div><div class="val">${money(total)}</div></div><div><div class="lbl">To'langan (${pct}%)</div><div class="val">${money(paid)}</div></div></div></section>
+  ${own()?`<div class="bar"><i style="width:${pct}%"></i></div>
+  <div class="two"><div><div class="lbl">Hisoblangan</div><div class="val">${money(total)}</div></div><div><div class="lbl">To'langan (${pct}%)</div><div class="val">${money(paid)}</div></div></div>`:""}</section>
   ${upcomingBox()}
-  <button class="btn pri wide" onclick="go('rep')">Oylik hisobot: kim qarz, biz kimdan qarz</button>
+  ${own()?`<button class="btn pri wide" onclick="go('rep')">Oylik hisobot: kim qarz, biz kimdan qarz</button>`:""}
   <div class="filters"><input id="q" type="search" placeholder="Ism bo'yicha qidirish" aria-label="Ism bo'yicha qidirish" value="${esc(F.q)}" oninput="F.q=this.value;drawRows()"><select id="fg" aria-label="Guruh" onchange="F.g=this.value;drawRows()"><option value="">Barcha guruhlar</option>${opts}</select></div>
   <div class="seg">${seg}</div>
   <div class="seg"><button class="${F.mode==="grp"?"on":""}" onclick="F.mode='grp';render()">Guruh bo'yicha</button><button class="${F.mode==="stu"?"on":""}" onclick="F.mode='stu';render()">O'quvchi bo'yicha</button></div>
@@ -456,13 +461,14 @@ function grpView(){
     const v=version(g,month),all=lessonDates(g,month),c=g.cancelled||[],n=all.filter(d=>!c.includes(d)).length;
     const cnt=Object.values(S.students).filter(s=>id in stuCourses(s,month)).length;
     const r=calc(v.price,v.pack,n);
-    return `<article class="card"><div class="top"><div><h2>${esc(g.name)}</h2><div class="lbl">${esc(dayNames(v.days))}${g.time?" · "+esc(g.time):""}${tName(g)?" · "+esc(tName(g)):""} · ${cnt} o'quvchi</div></div><button class="btn" onclick="grpSheet('${id}')">Tahrirlash</button></div>
+    const o=own();
+    return `<article class="card"><div class="top"><div><h2>${esc(g.name)}</h2><div class="lbl">${esc(dayNames(v.days))}${g.time?" · "+esc(g.time):""}${tName(g)?" · "+esc(tName(g)):""} · ${cnt} o'quvchi</div></div>${o?`<button class="btn" onclick="grpSheet('${id}')">Tahrirlash</button>`:""}</div>
     <div class="calc"><div><span>Oylik narx (${v.pack} dars)</span><span>${money(v.price)}</span></div>${r.extra?`<div><span>Qo'shimcha ${r.extra} dars</span><span>${money(r.total-v.price)}</span></div>`:""}<div class="t"><span>${mName(month)}: ${n} dars</span><span>${money(r.total)} so'm</span></div></div>
-    <div class="lbl">Dars bo'lmagan kunni bosib bekor qiling:</div>
-    <div class="dates">${all.map(d=>`<button class="date ${c.includes(d)?"x":""}" aria-label="${d}" onclick="toggleDay('${id}','${d}')">${+d.slice(8)}</button>`).join("")}</div></article>`}).join("");
-  return monthBar()+`<button class="btn pri wide" onclick="grpSheet()">Guruh qo'shish</button>`+(cards||`<div class="empty">Hali guruh yo'q.</div>`);
+    <div class="lbl">${o?"Dars bo'lmagan kunni bosib bekor qiling:":"Dars kunlari (bekor qilinganlari qizil):"}</div>
+    <div class="dates">${all.map(d=>`<button class="date ${c.includes(d)?"x":""}" aria-label="${d}" ${o?`onclick="toggleDay('${id}','${d}')"`:"disabled"}>${+d.slice(8)}</button>`).join("")}</div></article>`}).join("");
+  return monthBar()+(own()?`<button class="btn pri wide" onclick="grpSheet()">Guruh qo'shish</button>`:"")+(cards||`<div class="empty">Hali guruh yo'q.</div>`);
 }
-function toggleDay(id,d){const g=S.groups[id],c=new Set(g.cancelled||[]);c.has(d)?c.delete(d):c.add(d);put("groups",id,Object.assign({},g,{cancelled:[...c]}))}
+function toggleDay(id,d){if(!own())return;const g=S.groups[id],c=new Set(g.cancelled||[]);c.has(d)?c.delete(d):c.add(d);put("groups",id,Object.assign({},g,{cancelled:[...c]}))}
 function stuView(){
   const L=Object.entries(S.students).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const list=L.map(([id,s])=>{
@@ -621,7 +627,7 @@ function payAll(sid){
   const L=d.prev.concat(d.cur).filter(r=>r.left>0);
   L.forEach((r,i)=>{
     const x=i===L.length-1?a:Math.min(a,r.left);a-=x;
-    if(x>0)put("payments",uid(),Object.assign({month:r.m,sid,gid:r.gid,amount:x,date,method},r.b.k?{cyc:r.b.k}:{}));
+    if(x>0)put("payments",uid(),Object.assign({month:r.m,sid,gid:r.gid,amount:x,date,method,by:AUTH.uid},r.b.k?{cyc:r.b.k}:{}));
   });
   closeSheet();toast("To'lov yozildi");
 }
@@ -637,7 +643,7 @@ function paySheet(sid,gid,m,k){
   <div class="calc">${b.abs?`<div><span>Kelmagan darslar</span><span>${b.abs} ta</span></div>`:""}${line}${dl}<div class="t"><span>Jami</span><span>${money(b.total)} so'm</span></div>${r.credit?`<div><span>Oldingi oydan o'tgan</span><span>${money(r.credit)}</span></div>`:""}<div><span>To'langan</span><span>${money(paid)}</span></div><div><span>Qoldi</span><span>${money(left)}</span></div>${r.over?`<div><span>Keyingi oyga o'tadi</span><span>${money(r.over)}</span></div>`:""}</div>
   <div class="lbl">${b.cyc?"Kelmagan kunini bosing: u dars sanalmaydi, davr bir darsga uzayadi.":"Kelmagan kunini bosing, shu dars narxdan ayiriladi:"}</div>
   <div class="dates">${b.all.map(d=>`<button class="date ${b.miss.includes(d)?"x":""}" aria-label="${d}" aria-pressed="${b.miss.includes(d)}" onclick="toggleAbs('${sid}','${gid}','${d}','${m}',${b.k||0})">${+d.slice(8)}</button>`).join("")}</div>
-  ${ps.length?`<div class="list">${ps.sort((x,y)=>x.date<y.date?-1:1).map(p=>`<div class="row"><div><div class="val">${money(p.amount)} so'm</div><div class="lbl">${esc(p.date)} · ${esc(p.method)}</div></div><button class="btn del" onclick="armDelete(this,()=>{del('payments','${p.id}');paySheet('${sid}','${gid}','${m}',${b.k||0})})">O'chirish</button></div>`).join("")}</div>`:""}
+  ${ps.length?`<div class="list">${ps.sort((x,y)=>x.date<y.date?-1:1).map(p=>`<div class="row"><div><div class="val">${money(p.amount)} so'm</div><div class="lbl">${esc(p.date)} · ${esc(p.method)}${own()&&p.by&&AUTH.staffName(p.by)?" · yozdi: "+esc(AUTH.staffName(p.by)):""}</div></div>${own()?`<button class="btn del" onclick="armDelete(this,()=>{del('payments','${p.id}');paySheet('${sid}','${gid}','${m}',${b.k||0})})">O'chirish</button>`:""}</div>`).join("")}</div>${own()?"":`<p class="note">Yozilgan to'lovni faqat rahbar o'zgartira yoki o'chira oladi.</p>`}`:""}
   <label class="f">Bergan puli (qisman bo'lsa, shu summani yozing)<input id="pa" inputmode="numeric" value="${left?money(left):""}" oninput="fmtMoney(this)"></label>
   <div class="two"><label class="f">Sana<input id="pd" type="date" value="${today()}"></label><label class="f">Usul<select id="pm"><option>Naqd</option><option>Karta</option><option>O'tkazma</option></select></label></div>
   <div class="acts"><button class="btn" onclick="closeSheet()">Yopish</button><button class="btn pri" onclick="savePay('${sid}','${gid}','${m}',${b.k||0})">To'lovni yozish</button></div>
@@ -652,7 +658,7 @@ function toggleAbs(sid,gid,d,m,k){
 function savePay(sid,gid,m,k){
   const amount=num(document.getElementById("pa").value);
   if(!amount){toast("Summani kiriting");return}
-  put("payments",uid(),Object.assign({month:m,sid,gid,amount,date:document.getElementById("pd").value||today(),method:document.getElementById("pm").value},k?{cyc:k}:{}));
+  put("payments",uid(),Object.assign({month:m,sid,gid,amount,date:document.getElementById("pd").value||today(),method:document.getElementById("pm").value,by:AUTH.uid},k?{cyc:k}:{}));
   closeSheet();toast("To'lov yozildi");
 }
 /* ---- To'lov kuni eslatmalari ---- */
@@ -688,6 +694,7 @@ function msgSheet(sid,kind,gid,m,k){
 }
 async function copyMsg(){try{await navigator.clipboard.writeText(document.getElementById("mt").value);toast("Matn nusxalandi")}catch(e){toast("Nusxalab bo'lmadi")}}
 function grpSheet(id){
+  if(!own())return;
   const g=id?S.groups[id]:null,v=g?version(g,month):{days:[],price:0,pack:12,hours:1.5};
 
   openSheet(`<h2>${g?"Guruhni tahrirlash":"Yangi guruh"}</h2>
@@ -716,7 +723,7 @@ function saveGrp(id){
   put("groups",id||uid(),{name,teacher:old?old.teacher||"":"",teacherId:old?old.teacherId||"":"",time:document.getElementById("gh").value.trim(),versions,cancelled:old?old.cancelled||[]:[]});
   closeSheet();
 }
-function togC(el){el.closest(".course").querySelector(".sub").style.display=el.checked?"flex":"none"}
+function togC(el){const s=el.closest(".course").querySelector(".sub");if(s)s.style.display=el.checked?"flex":"none"}
 function stuSheet(id,leadId){
   C={};LEAD=leadId||null;
   const pre=LEAD?S.leads[LEAD]:null;
@@ -728,24 +735,26 @@ function stuSheet(id,leadId){
   ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm</button>`:""}
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
   <label class="f">Telefon<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label>
-  <div><div class="lbl" style="margin-bottom:6px">Kurslari va chegirmasi</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label><div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div></div>`}).join("")}</div>`:`<p class="note">Avval guruh qo'shing.</p>`}</div>
+  <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">Chegirmani rahbar belgilaydi.</p>`}</div>
   <div class="two"><label class="f">Boshlagan sana<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
   ${s?`<p class="note">Kurs yoki chegirma o'zgarsa, ${mName(month)} oyidan boshlab qo'llanadi. Oldingi oylar o'zgarmaydi.</p>`:""}
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="ssave" onclick="saveStu(${s?`'${id}'`:""})">Saqlash</button></div>
-  ${s?`<button class="btn del wide" onclick="armDelete(this,()=>{closeSheet();del('students','${id}')})">O'quvchini o'chirish</button>`:""}`);
+  ${s&&own()?`<button class="btn del wide" onclick="armDelete(this,()=>{closeSheet();del('students','${id}')})">O'quvchini o'chirish</button>`:""}`);
 }
 function saveStu(id){
   const name=document.getElementById("sn").value.trim();
   if(!name){toast("Ism va familiyani kiriting");return}
   const btn=document.getElementById("ssave"),low=name.toLowerCase();
   if(!id&&!btn.dataset.a&&Object.values(S.students).some(x=>x.name.trim().toLowerCase()===low)){btn.dataset.a=1;btn.textContent="Baribir saqlash";toast("Bu ism allaqachon bor. Mavjud o'quvchiga kurs qo'shing.");return}
-  const groups={};
+  const groups={},old=id?S.students[id]:null,prev=old?stuCourses(old,month):{};
   for(const i of document.querySelectorAll("#sg input[type=checkbox]:checked")){
-    const raw=document.querySelector(`#sg input[data-g="${i.value}"]`).value.trim().replace(",","."),p=raw===""?0:parseFloat(raw);
+    const inp=document.querySelector(`#sg input[data-g="${i.value}"]`);
+    /* Xodim chegirmani o'zgartirmaydi: mavjud kursda eskisi qoladi, yangisida 0 */
+    if(!inp){groups[i.value]=i.value in prev?prev[i.value]:0;continue}
+    const raw=inp.value.trim().replace(",","."),p=raw===""?0:parseFloat(raw);
     if(!(p>=0&&p<=100)){toast("Chegirma 0 dan 100 gacha bo'lsin");return}
     groups[i.value]=p;
   }
-  const old=id?S.students[id]:null;
   let versions;
   if(!old)versions=[{from:"2000-01",groups}];
   else{
@@ -759,19 +768,26 @@ function saveStu(id){
 }
 function setSheet(){
   const au=window.AUTH;
+  const acct=au?`<div class="ghead"><h2>Hisob</h2><span class="lbl">${au.owner?"Rahbar":"Xodim"}</span></div>
+  <div class="calc"><div><span>Kirgan</span><span style="overflow-wrap:anywhere;text-align:right">${esc(au.email)}</span></div></div>`:"";
+  if(!own()){
+    openSheet(`<h2>Hisob</h2>${acct}<p class="note">Narxlar, guruhlar, ustozlar va sozlamalarni rahbar o'zgartiradi.</p>
+    <button class="btn del wide" onclick="AUTH.logout()">Chiqish</button><button class="btn wide" onclick="closeSheet()">Yopish</button>`);
+    return;
+  }
   openSheet(`<h2>Sozlamalar</h2>
   <label class="f">To'lov tartibi<select id="xm"><option value="cycle" ${billMode()==="cycle"?"selected":""}>12 darsdan: o'quvchi kelgan kunidan sanaladi</option><option value="month" ${billMode()==="month"?"selected":""}>Oylik: har oy 1-sanadan</option></select></label>
   <label class="f">Markaz nomi (ota-onaga xabar oxirida)<input id="xc" value="${esc(center())}"></label>
   <label class="f">Qarzni qaysi oydan hisoblash<input id="xt" type="month" value="${trackFrom()}"></label>
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" onclick="saveSet()">Saqlash</button></div>
-  ${au?`<div class="ghead"><h2>Hisob</h2><span class="lbl">${au.owner?"Rahbar":"Xodim"}</span></div>
-  <div class="calc"><div><span>Kirgan</span><span style="overflow-wrap:anywhere;text-align:right">${esc(au.email)}</span></div></div>
+  ${au?`${acct}
   ${au.owner?`<button class="btn wide" onclick="staffSheet()">Xodimlar: kimga kirish ruxsati bor</button>
   <button class="btn wide" onclick="exportData()">Zaxira nusxani yuklab olish</button>
   <label class="btn wide" style="position:relative;overflow:hidden">Fayldan ma'lumot yuklash<input type="file" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;cursor:pointer" onchange="importPick(this)"></label>`:""}
   <button class="btn del wide" onclick="AUTH.logout()">Chiqish</button>`:""}`);
 }
 function saveSet(){
+  if(!own())return;
   const st=S.settings.main,versions=st&&st.versions?st.versions:[{from:"2000-01",family:5,multi:10}];
   put("settings","main",{trackFrom:document.getElementById("xt").value||trackFrom(),versions,mode:document.getElementById("xm").value,center:document.getElementById("xc").value.trim()});
   closeSheet();
@@ -780,8 +796,8 @@ function saveSet(){
 /* ---- Xodimlar (faqat rahbar) ---- */
 function staffSheet(){
   const L=AUTH.staff();
-  openSheet(`<h2>Xodimlar</h2><p class="note">Bu yerga qo'shilgan xodim saytga o'z email va paroli bilan kiradi. Ro'yxatdan o'chirilsa, endi kira olmaydi.</p>
-  ${L.length?`<div class="list">${L.map(x=>`<div class="row"><div><div class="name">${esc(x.name||x.id)}</div><div class="lbl" style="overflow-wrap:anywhere">${esc(x.id)}</div></div><button class="btn del" onclick="armDelete(this,()=>staffDel('${esc(x.id)}'))">O'chirish</button></div>`).join("")}</div>`:`<div class="empty">Hali xodim qo'shilmagan.</div>`}
+  openSheet(`<h2>Xodimlar</h2><p class="note">Xodim to'lov yozadi, yo'qlama qiladi, o'quvchi va murojaatlarni yuritadi. Ustozlar oyligi, hisobot, narx va sozlamalarni ko'rmaydi; yozilgan to'lovni o'chira olmaydi. Ro'yxatdan o'chirilsa, endi kira olmaydi.</p>
+  ${L.length?`<div class="list">${L.map(x=>`<div class="row"><div><div class="name">${esc(x.name||x.email||x.id)}</div><div class="lbl" style="overflow-wrap:anywhere">${esc(x.email||"")} · UID ${esc(x.id)}</div></div><button class="btn del" onclick="armDelete(this,()=>staffDel('${esc(x.id)}'))">O'chirish</button></div>`).join("")}</div>`:`<div class="empty">Hali xodim qo'shilmagan.</div>`}
   <div class="ghead"><h2>Yangi xodim</h2></div>
   <label class="f">Ismi<input id="xn" autocomplete="off"></label>
   <label class="f">Email<input id="xe" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
@@ -795,7 +811,7 @@ async function staffAdd(){
   if(pass.length<6){toast("Parol kamida 6 belgi bo'lsin");return}
   if(email===AUTH.email){toast("Bu sizning emailingiz");return}
   const b=document.getElementById("xadd");b.disabled=true;b.textContent="Qo'shilmoqda…";
-  try{const r=await AUTH.addStaff(email,pass,name);staffShare(email,r.created?pass:"",r.note)}
+  try{await AUTH.addStaff(email,pass,name);staffShare(email,pass,"")}
   catch(e){toast(e&&e.message||"Qo'shib bo'lmadi");b.disabled=false;b.textContent="Xodim qo'shish"}
 }
 async function staffDel(id){
@@ -959,35 +975,39 @@ async function main(){
     doc:id=>({set:d=>Fs.setDoc(Fs.doc(fs,c,id),d),delete:()=>Fs.deleteDoc(Fs.doc(fs,c,id))}),
     onSnapshot:(cb,er)=>Fs.onSnapshot(Fs.collection(fs,c),cb,er)
   })};
-  let staff={},staffReady=false,started=false,denied=false;
+  let staff={},started=false,denied=false;
+  /* Xodim faqat shu bo'limlarni o'qiydi: ustozlar va oyliklar rahbarniki */
+  const WORKER=["groups","students","payments","settings","leads"];
   window.AUTH={
-    email:"",
-    get owner(){return staffReady&&!!this.email&&!(this.email in staff)},
-    staff:()=>Object.entries(staff).map(([id,v])=>Object.assign({id},v)).sort((a,b)=>(a.name||a.id).localeCompare(b.name||b.id)),
+    email:"",uid:"",role:"",
+    get owner(){return this.role==="owner"},
+    staff:()=>Object.entries(staff).map(([id,v])=>Object.assign({id},v)).sort((a,b)=>(a.name||a.email||a.id).localeCompare(b.name||b.email||b.id)),
+    staffName:id=>staff[id]?staff[id].name||staff[id].email||"":"",
     async logout(){try{await Au.signOut(auth)}catch(e){}location.reload()},
     async denied(){
       if(denied)return;denied=true;
-      try{sessionStorage.setItem("authMsg",`«${this.email}» uchun ruxsat yo'q. Rahbardan sizni xodimlar ro'yxatiga qo'shishini so'rang.`)}catch(e){}
+      try{sessionStorage.setItem("authMsg",`«${this.email}» uchun ruxsat yo'q. Rahbardan sizni xodimlar ro'yxatiga qo'shishini so'rang. (UID: ${this.uid})`)}catch(e){}
       try{await Au.signOut(auth)}catch(e){}location.reload();
     },
+    /* Xodim akkaunti alohida (ikkinchi) ilovada ochiladi, rahbar chiqib ketmaydi */
     async addStaff(email,pass,name){
-      let created=false,note="";
+      let id="";
       const sec=A.initializeApp(cfg,"add-"+Date.now()),sa=Au.initializeAuth(sec,{persistence:Au.inMemoryPersistence});
-      try{await Au.createUserWithEmailAndPassword(sa,email,pass);created=true}
+      try{const cr=await Au.createUserWithEmailAndPassword(sa,email,pass);id=cr.user.uid}
       catch(x){
         const c=x&&x.code||"";
-        if(c==="auth/email-already-in-use")note="Bu email avval ro'yxatdan o'tgan. Xodim o'sha akkauntning eski paroli bilan kiradi.";
-        else if(c==="auth/weak-password")throw new Error("Parol juda oddiy. Kamida 6 belgi yozing.");
-        else if(c==="auth/invalid-email")throw new Error("Email noto'g'ri yozilgan.");
-        else if(c==="auth/operation-not-allowed")throw new Error("Firebase'da Email/Password kirish yoqilmagan.");
-        else if(c==="auth/network-request-failed")throw new Error("Internetga ulanib bo'lmadi.");
-        else throw new Error("Akkaunt ochib bo'lmadi ("+c+").");
+        if(c==="auth/email-already-in-use")throw new Error("Bu email bilan akkaunt allaqachon bor. Boshqa email yozing yoki Firebase konsolida (Authentication → Users) eski akkauntni o'chirib, qayta qo'shing.");
+        if(c==="auth/weak-password")throw new Error("Parol juda oddiy. Kamida 6 belgi yozing.");
+        if(c==="auth/invalid-email")throw new Error("Email noto'g'ri yozilgan.");
+        if(c==="auth/operation-not-allowed")throw new Error("Firebase'da Email/Password kirish yoqilmagan.");
+        if(c==="auth/network-request-failed")throw new Error("Internetga ulanib bo'lmadi.");
+        throw new Error("Akkaunt ochib bo'lmadi ("+c+").");
       }finally{
         try{await Au.signOut(sa)}catch(e){}
         try{await A.deleteApp(sec)}catch(e){}
       }
-      await Fs.setDoc(Fs.doc(fs,"staff",email),{name:name||"",added:new Date().toISOString().slice(0,10)});
-      return{created,note};
+      await Fs.setDoc(Fs.doc(fs,"staff",id),{email,name:name||"",added:new Date().toISOString().slice(0,10)});
+      return id;
     },
     removeStaff:id=>Fs.deleteDoc(Fs.doc(fs,"staff",id)),
     async importDocs(items){
@@ -1014,12 +1034,22 @@ async function main(){
   Au.onAuthStateChanged(auth,u=>{
     if(!u){if(!started)showLogin();return}
     if(started)return;started=true;
-    AUTH.email=(u.email||"").toLowerCase();
+    AUTH.email=(u.email||"").toLowerCase();AUTH.uid=u.uid;
     box.hidden=true;err.textContent="";document.body.classList.remove("out");
     document.getElementById("app").innerHTML=`<p class="note">Yuklanmoqda…</p>`;
-    Fs.onSnapshot(Fs.collection(fs,"staff"),s=>{staff={};s.docs.forEach(d=>staff[d.id]=d.data());staffReady=true},
-      x=>{if(x&&x.code==="permission-denied")AUTH.denied()});
-    init(api);
+    let decided=false;
+    const start=(role,cols)=>{if(decided)return;decided=true;AUTH.role=role;render();init(api,cols)};
+    /* Rolni Firestore qoidalari belgilaydi: xodimlar ro'yxatini faqat rahbar (UID) o'qiy oladi,
+       xodim esa faqat o'z yozuvini (staff/<UID>) ko'radi. Boshqa hamma — ruxsatsiz. */
+    Fs.onSnapshot(Fs.collection(fs,"staff"),s=>{
+      staff={};s.docs.forEach(d=>staff[d.id]=d.data());start("owner");
+    },()=>{
+      if(decided)return;
+      Fs.onSnapshot(Fs.doc(fs,"staff",u.uid),d=>{
+        if(!d.exists()){AUTH.denied();return}
+        start("worker",WORKER);
+      },()=>AUTH.denied());
+    });
   });
 }
 main();
