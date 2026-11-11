@@ -1006,7 +1006,8 @@ async function main(){
     try{await Au.signInWithEmailAndPassword(auth,em,pw)}
     catch(x){
       const c=x&&x.code||"";
-      showLogin(c==="auth/too-many-requests"?"Juda ko'p urinish bo'ldi. Birozdan keyin qayta urinib ko'ring.":c==="auth/network-request-failed"?"Internetga ulanib bo'lmadi.":c==="auth/invalid-email"?"Email noto'g'ri yozilgan.":"Email yoki parol noto'g'ri.");
+      const bad=["auth/invalid-credential","auth/invalid-login-credentials","auth/wrong-password","auth/user-not-found","auth/user-disabled"].includes(c);
+      showLogin(bad?"Email yoki parol noto'g'ri.":c==="auth/too-many-requests"?"Juda ko'p urinish bo'ldi. Birozdan keyin qayta urinib ko'ring.":c==="auth/network-request-failed"?"Internetga ulanib bo'lmadi.":c==="auth/invalid-email"?"Email noto'g'ri yozilgan.":"Kirib bo'lmadi ("+(c||"xato")+"). Rahbarga ayting.");
     }
     return false;
   };
