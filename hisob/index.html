@@ -965,7 +965,7 @@ function showLogin(msg,locked){
 }
 async function main(){
   let cfg=null;
-  try{cfg=(await import("./config.js")).firebaseConfig}catch(e){}
+  try{cfg=(await import("./config.js?v=2")).firebaseConfig}catch(e){}
   if(!cfg||!cfg.apiKey){showLogin("Sayt hali ulanmagan: Firebase sozlamalari qo'shilgach ishlaydi.",true);return}
   let A,Au,Fs;
   try{[A,Au,Fs]=await Promise.all([import(SDK+"firebase-app.js"),import(SDK+"firebase-auth.js"),import(SDK+"firebase-firestore.js")])}
