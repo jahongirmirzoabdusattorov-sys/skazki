@@ -1,15 +1,15 @@
 name: Telegram bot (to'lov eslatmalari)
 on:
   schedule:
-    - cron: "*/15 * * * *"   # har 15 daqiqada
+    - cron: "3 * * * *"   # har soatda; bot ~55 daqiqa uzluksiz ishlaydi
   workflow_dispatch: {}
 concurrency:
   group: telegram-bot
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 62
     env:
       TZ: Asia/Tashkent
     steps:
