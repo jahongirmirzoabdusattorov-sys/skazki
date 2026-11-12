@@ -41,6 +41,7 @@ const stRef = db.collection("botstate").doc("tg");
 const st = (await stRef.get()).data() || {};
 const up = await api("getUpdates", { offset: st.offset || 0, timeout: 0, allowed_updates: ["message"] });
 let offset = st.offset || 0, changed = false;
+console.log("Telegram yangilanishlar:", (up.result || []).length, up.ok ? "" : "(getUpdates xato)");
 for (const u of up.result || []) {
   offset = u.update_id + 1;
   const m = u.message; if (!m || !m.text || !m.chat) continue;
