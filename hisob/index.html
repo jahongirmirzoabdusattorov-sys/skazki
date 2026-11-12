@@ -237,7 +237,7 @@ function cycles(sid,gid,m){
   const st=s.start||trackFrom()+"-01",miss=(s.absent&&s.absent[gid])||[],dates=[];
   for(let mm=st.slice(0,7);mm<=hz;mm=shift(mm,1)){
     if(!(gid in stuCourses(s,mm)))continue;
-    for(const d of activeDates(g,mm))if(d>=st&&(!s.end||d<=s.end)&&!miss.includes(d))dates.push(d);
+    for(const d of activeDates(g,mm))if(d>=st&&(!s.end||d<=s.end))dates.push(d);
   }
   const out=[];
   for(let i=0,k=1;i<dates.length;k++){const pack=version(g,dates[i].slice(0,7)).pack,ch=dates.slice(i,i+pack);out.push({k,start:ch[0],last:ch[ch.length-1],n:ch.length,pack});i+=pack}
@@ -245,11 +245,13 @@ function cycles(sid,gid,m){
   return C[key]=out;
 }
 function cycleBill(sid,s,g,gid,c){
-  const v=version(g,c.start.slice(0,7)),n=s.end?c.n:c.pack,r=calc(v.price,c.pack,n),all=[];
-  for(let mm=c.start.slice(0,7);mm<=(c.next||c.last).slice(0,7);mm=shift(mm,1))
-    for(const d of activeDates(g,mm))if(d>=c.start&&(c.next?d<c.next:d<=c.last)&&(!s.end||d<=s.end))all.push(d);
+  /* Kelmagan dars davrni surmaydi: shu dars narxi summadan ayiriladi */
+  const v=version(g,c.start.slice(0,7)),n=s.end?c.n:c.pack,all=[];
+  for(let mm=c.start.slice(0,7);mm<=c.last.slice(0,7);mm=shift(mm,1))
+    for(const d of activeDates(g,mm))if(d>=c.start&&d<=c.last&&(!s.end||d<=s.end))all.push(d);
   const miss=((s.absent&&s.absent[gid])||[]).filter(d=>all.includes(d));
-  return Object.assign(r,{extra:0,n:c.n,price:v.price,pack:c.pack,all,miss,abs:miss.length,k:c.k,cyc:c.start,last:c.last,next:c.next});
+  const full=calc(v.price,c.pack,n).total,r=calc(v.price,c.pack,Math.max(0,n-miss.length));
+  return Object.assign(r,{full,absSum:full-r.total,extra:0,n:c.n,price:v.price,pack:c.pack,all,miss,abs:miss.length,k:c.k,cyc:c.start,last:c.last,next:c.next});
 }
 function cyPays(sid,gid,cs,k){
   const key="q"+sid+"|"+gid;
@@ -660,12 +662,12 @@ function paySheet(sid,gid,m,k){
   const s=S.students[sid],g=S.groups[gid],r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&(!k||x.b.k===k));
   if(!r){closeSheet();return}
   const b=r.b,ps=b.k?cyPays(sid,gid,cycles(sid,gid,m),b.k):paysFor(sid,gid,m),paid=r.paid,left=r.left,all=debt(sid,month);
-  const line=b.cyc?`<div><span>${b.pack} dars: ${fmtD(b.cyc)}–${fmtD(b.last)}${s.end&&b.n<b.pack?` (${b.n} dars)`:""}</span><span>${money(b.gross)}</span></div>${b.next?`<div><span>Keyingi to'lov kuni</span><span>${fmtD(b.next)}</span></div>`:""}`:b.n<b.pack?`<div><span>${b.n} dars × ${money(b.one)}</span><span>${money(b.gross)}</span></div>`:`<div><span>Oylik narx (${b.pack} dars)</span><span>${money(b.price)}</span></div>${b.extra?`<div><span>Qo'shimcha ${b.extra} dars × ${money(b.one)}</span><span>${money(b.gross-b.price)}</span></div>`:""}`+"";
+  const line=b.cyc?`<div><span>${b.pack} dars: ${fmtD(b.cyc)}–${fmtD(b.last)}${s.end&&b.n<b.pack?` (${b.n} dars)`:""}</span><span>${money(b.full)}</span></div>${b.abs?`<div><span>Kelmagan ${b.abs} dars × ${money(b.one)}</span><span>−${money(b.absSum)}</span></div>`:""}${b.next?`<div><span>Keyingi to'lov kuni</span><span>${fmtD(b.next)}</span></div>`:""}`:b.n<b.pack?`<div><span>${b.n} dars × ${money(b.one)}</span><span>${money(b.gross)}</span></div>`:`<div><span>Oylik narx (${b.pack} dars)</span><span>${money(b.price)}</span></div>${b.extra?`<div><span>Qo'shimcha ${b.extra} dars × ${money(b.one)}</span><span>${money(b.gross-b.price)}</span></div>`:""}`+"";
   const dl=b.pct?`<div><span>Chegirma ${b.pct}% (${esc(b.why)})</span><span>−${money(b.disc)}</span></div>`:"";
   const many=all.cur.length>1||all.prevLeft>0?`<button class="sublink" onclick="debtSheet('${sid}')">Barcha kurslar bo'yicha jami qarz: ${money(all.total)} so'm</button>`:"";
   openSheet(`<h2>${esc(s.name)}</h2><p class="note">${esc(g.name)} · ${b.cyc?fmtD(b.cyc)+" dan boshlangan "+b.k+"-davr":mName(m)}</p>${many}
   <div class="calc">${b.abs?`<div><span>Kelmagan darslar</span><span>${b.abs} ta</span></div>`:""}${line}${dl}<div class="t"><span>Jami</span><span>${money(b.total)} so'm</span></div>${r.credit?`<div><span>Oldingi oydan o'tgan</span><span>${money(r.credit)}</span></div>`:""}<div><span>To'langan</span><span>${money(paid)}</span></div><div><span>Qoldi</span><span>${money(left)}</span></div>${r.over?`<div><span>Keyingi oyga o'tadi</span><span>${money(r.over)}</span></div>`:""}</div>
-  <div class="lbl">${b.cyc?"Kelmagan kunini bosing: u dars sanalmaydi, davr bir darsga uzayadi.":"Kelmagan kunini bosing, shu dars narxdan ayiriladi:"}</div>
+  <div class="lbl">${b.cyc?"Kelmagan kunini bosing, shu dars summadan ayiriladi:":"Kelmagan kunini bosing, shu dars narxdan ayiriladi:"}</div>
   <div class="dates">${b.all.map(d=>`<button class="date ${b.miss.includes(d)?"x":""}" aria-label="${d}" aria-pressed="${b.miss.includes(d)}" onclick="toggleAbs('${sid}','${gid}','${d}','${m}',${b.k||0})">${+d.slice(8)}</button>`).join("")}</div>
   ${ps.length?`<div class="list">${ps.sort((x,y)=>x.date<y.date?-1:1).map(p=>`<div class="row"><div><div class="val">${money(p.amount)} so'm</div><div class="lbl">${esc(p.date)} · ${esc(p.method)}${own()&&p.by&&AUTH.staffName(p.by)?" · yozdi: "+esc(AUTH.staffName(p.by)):""}</div></div>${own()?`<button class="btn del" onclick="armDelete(this,()=>{del('payments','${p.id}');paySheet('${sid}','${gid}','${m}',${b.k||0})})">O'chirish</button>`:""}</div>`).join("")}</div>${own()?"":`<p class="note">Yozilgan to'lovni faqat rahbar o'zgartira yoki o'chira oladi.</p>`}`:""}
   <label class="f">Bergan puli (qisman bo'lsa, shu summani yozing)<input id="pa" inputmode="numeric" value="${left?money(left):""}" oninput="fmtMoney(this)"></label>
@@ -709,7 +711,7 @@ function msgSheet(sid,kind,gid,m,k){
   }else if(kind==="info"){
     const r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&x.b.k===k);if(!r){closeSheet();return}
     const b=r.b,paid=got(r);
-    txt=`Assalomu alaykum! ${s.name}, "${r.g.name}" kursi.\nTo'lov davri: ${fullD(b.cyc)} – ${fullD(b.last)} (${b.n} ta dars).\nSumma: ${money(b.total)} so'm${b.pct?` (${b.pct}% chegirma bilan)`:""}.\n${r.left?`To'langan: ${money(paid)} so'm, qoldi: ${money(r.left)} so'm.`:`To'langan: ${money(paid)} so'm. Rahmat!`}${b.next?`\nKeyingi to'lov kuni: ${fullD(b.next)}.`:""}\nDarsga kelinmagan kun 12 taga kirmaydi, davr shunga qarab uzayadi.`;
+    txt=`Assalomu alaykum! ${s.name}, "${r.g.name}" kursi.\nTo'lov davri: ${fullD(b.cyc)} – ${fullD(b.last)} (${b.pack} ta dars).${b.abs?`\nKelmagan darslar: ${b.abs} ta, summadan ${money(b.absSum)} so'm ayirildi.`:""}\nSumma: ${money(b.total)} so'm${b.pct?` (${b.pct}% chegirma bilan)`:""}.\n${r.left?`To'langan: ${money(paid)} so'm, qoldi: ${money(r.left)} so'm.`:`To'langan: ${money(paid)} so'm. Rahmat!`}${b.next?`\nKeyingi to'lov kuni: ${fullD(b.next)}.`:""}`;
   }else{
     const d=debt(sid,month);txt=`Assalomu alaykum! ${s.name}ning o'qish to'lovi bo'yicha ${money(d.total)} so'm qarzdorlik bor. Iltimos, to'lovni amalga oshiring.`;
   }
