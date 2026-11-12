@@ -57,6 +57,7 @@ for (const u of up.result || []) {
   } else if (cmd === "/start" && arg && data.students[arg]) {
     await db.collection("students").doc(arg).update({ [`tg.${chat}`]: { name: who, at: new Date().toISOString().slice(0, 10) } });
     changed = true;
+    console.log("Ulandi:", data.students[arg].name);
     await api("sendMessage", { chat_id: chat, text: `Rahmat! Siz ${data.students[arg].name} uchun to'lov eslatmalariga ulandingiz. To'lov kuni yaqinlashganda shu yerga xabar keladi.\n\nTo'xtatish uchun: /stop\n\n${center}` });
   } else if (cmd === "/start") {
     await api("sendMessage", { chat_id: chat, text: `Assalomu alaykum! Ulanish uchun ${center} yuborgan maxsus havolani bosing.` });
@@ -64,6 +65,7 @@ for (const u of up.result || []) {
   } else if (cmd === "/stop") {
     for (const [id, s] of Object.entries(data.students)) if (s.tg && s.tg[chat]) await db.collection("students").doc(id).update({ [`tg.${chat}`]: FieldValue.delete() });
     changed = true;
+    console.log("/stop: ulanish o'chirildi");
     await api("sendMessage", { chat_id: chat, text: "Eslatmalar to'xtatildi. Qayta ulanish uchun markaz yuborgan havolani bosing." });
   } else {
     await api("sendMessage", { chat_id: chat, text: `Bu bot faqat to'lov eslatmalarini yuboradi. Savollar bo'lsa, ${center} bilan bog'laning.` });
