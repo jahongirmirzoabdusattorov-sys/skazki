@@ -735,7 +735,7 @@ function stuSheet(id,leadId){
   ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm</button>`:""}
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
   <label class="f">Telefon<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label>
-  <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">Chegirmani rahbar belgilaydi.</p>`}</div>
+  <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} ${!own()&&s?"disabled":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">${s?"Kurs va chegirmani rahbar o'zgartiradi.":"Chegirmani rahbar belgilaydi."}</p>`}</div>
   <div class="two"><label class="f">Boshlagan sana<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
   ${s?`<p class="note">Kurs yoki chegirma o'zgarsa, ${mName(month)} oyidan boshlab qo'llanadi. Oldingi oylar o'zgarmaydi.</p>`:""}
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="ssave" onclick="saveStu(${s?`'${id}'`:""})">Saqlash</button></div>
@@ -746,7 +746,13 @@ function saveStu(id){
   if(!name){toast("Ism va familiyani kiriting");return}
   const btn=document.getElementById("ssave"),low=name.toLowerCase();
   if(!id&&!btn.dataset.a&&Object.values(S.students).some(x=>x.name.trim().toLowerCase()===low)){btn.dataset.a=1;btn.textContent="Baribir saqlash";toast("Bu ism allaqachon bor. Mavjud o'quvchiga kurs qo'shing.");return}
-  const groups={},old=id?S.students[id]:null,prev=old?stuCourses(old,month):{};
+  const old=id?S.students[id]:null;
+  /* Xodim mavjud o'quvchida faqat ism, telefon va sanalarni o'zgartiradi (kurs va chegirma — rahbarniki) */
+  if(old&&!own()){
+    put("students",id,Object.assign({},old,{name,phone:document.getElementById("sp").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value}));
+    closeSheet();return;
+  }
+  const groups={},prev=old?stuCourses(old,month):{};
   for(const i of document.querySelectorAll("#sg input[type=checkbox]:checked")){
     const inp=document.querySelector(`#sg input[data-g="${i.value}"]`);
     /* Xodim chegirmani o'zgartirmaydi: mavjud kursda eskisi qoladi, yangisida 0 */
@@ -834,6 +840,26 @@ function exportData(){
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
 }
 let IMP=null;
+/* Bir xil yozuvni topish uchun "tabiiy kalit" (ID boshqa bo'lsa ham takror bo'lmasin) */
+function natKey(c,v){
+  const n=x=>String(x==null?"":x).trim().toLowerCase(),ph=x=>String(x||"").replace(/\D/g,"").slice(-9);
+  if(c==="students"||c==="leads")return n(v.name)+"|"+ph(v.phone);
+  if(c==="groups"||c==="teachers")return n(v.name);
+  if(c==="payments")return [v.sid,v.gid,v.amount,v.date,v.month].join("|");
+  if(c==="salaries")return [v.tid,v.amount,v.date,v.month].join("|");
+  return "";
+}
+function importPlan(items){
+  const add=[],same=[],dup=[];
+  for(const it of items){
+    const[c,id,v]=it,cur=S[c]||{};
+    if(id in cur){same.push(it);continue}
+    const k=natKey(c,v);
+    if(k&&Object.values(cur).some(x=>natKey(c,x)===k)){dup.push(it);continue}
+    add.push(it);
+  }
+  return{add,same,dup};
+}
 async function importPick(inp){
   const f=inp.files&&inp.files[0];inp.value="";if(!f)return;
   let d;try{d=JSON.parse(await f.text())}catch(e){toast("Faylni o'qib bo'lmadi");return}
@@ -841,18 +867,23 @@ async function importPick(inp){
   for(const col of Object.keys(S))if(d&&d[col]&&typeof d[col]==="object")
     for(const[id,v]of Object.entries(d[col]))if(v&&typeof v==="object"&&!Array.isArray(v)&&id&&!id.includes("/"))items.push([col,id,v]);
   if(!items.length){toast("Faylda ma'lumot topilmadi");return}
-  IMP=items;
-  const cnt=Object.keys(S).map(c=>[c,items.filter(x=>x[0]===c).length]).filter(x=>x[1]);
-  openSheet(`<h2>Ma'lumotlarni yuklash</h2><p class="note">${esc(f.name)}</p>
-  <div class="calc">${cnt.map(([c,n])=>`<div><span>${esc(c)}</span><span>${n} ta</span></div>`).join("")}<div class="t"><span>Jami</span><span>${items.length} ta yozuv</span></div></div>
-  <p class="note">Saytdagi boshqa yozuvlar o'chmaydi. Faylda bor yozuvlar saytga qo'shiladi yoki yangilanadi.</p>
-  <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="impgo" onclick="importGo()">Yuklash</button></div>`);
+  const P=importPlan(items);IMP=P.add;
+  const by=L=>Object.keys(S).map(c=>[c,L.filter(x=>x[0]===c).length]).filter(x=>x[1]).map(([c,n])=>`<div><span>${esc(c)}</span><span>${n} ta</span></div>`).join("");
+  const nm=([c,id,v])=>esc(v.name||[v.date,v.amount&&money(v.amount)].filter(Boolean).join(" · ")||id);
+  openSheet(`<h2>Ma'lumotlarni yuklash</h2><p class="note">${esc(f.name)} · ${items.length} ta yozuv</p>
+  <div class="ghead"><h2>Qo'shiladi: ${P.add.length}</h2></div>${P.add.length?`<div class="calc">${by(P.add)}</div>`:""}
+  ${P.same.length?`<div class="ghead"><h2>Saytda allaqachon bor: ${P.same.length}</h2></div><p class="note">Xuddi shu yozuv (ID) saytda bor — tegilmaydi, ustidan yozilmaydi.</p><div class="calc">${by(P.same)}</div>`:""}
+  ${P.dup.length?`<div class="ghead"><h2>O'xshashi bor: ${P.dup.length}</h2></div><p class="note">Saytda shu ism (yoki shu to'lov) boshqa ID bilan bor — takror bo'lmasligi uchun qo'shilmaydi:</p><div class="calc">${P.dup.map(it=>`<div><span>${esc(it[0])}</span><span>${nm(it)}</span></div>`).join("")}</div>`:""}
+  <p class="note">Saytdagi hech bir yozuv o'chirilmaydi va o'zgartirilmaydi.</p>
+  <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="impgo" onclick="importGo()" ${P.add.length?"":"disabled"}>${P.add.length} ta yozuvni qo'shish</button></div>`);
 }
 async function importGo(){
-  if(!IMP)return;
+  if(!IMP||!IMP.length)return;
   const b=document.getElementById("impgo");b.disabled=true;b.textContent="Yuklanmoqda…";
-  try{await AUTH.importDocs(IMP);IMP=null;closeSheet();toast("Ma'lumotlar yuklandi")}
-  catch(e){b.disabled=false;b.textContent="Yuklash";toast("Yuklab bo'lmadi. Internetni tekshiring.")}
+  /* Oxirgi tekshiruv: shu orada paydo bo'lgan yozuvlarga ham tegilmaydi */
+  const L=importPlan(IMP).add;
+  try{await AUTH.importDocs(L);IMP=null;closeSheet();toast(L.length+" ta yozuv qo'shildi")}
+  catch(e){b.disabled=false;b.textContent="Qayta urinish";toast("Yuklab bo'lmadi. Internetni tekshiring.")}
 }
 function tcType(gid){
   const t=document.getElementById("ct-"+gid).value,show=(k,on)=>document.getElementById(k+"-"+gid).style.display=on?"flex":"none";
