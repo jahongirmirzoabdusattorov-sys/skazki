@@ -26,6 +26,16 @@ async function loadData() {
 let data = await loadData();
 const center = (data.settings.main && data.settings.main.center) || "o'quv markazi";
 
+// Bot nomini saytdagi sozlamaga o'zi yozadi (ota-onaga havola shundan tuziladi)
+const me = await api("getMe");
+if (!me.ok) { console.log("Telegram token ishlamadi — GitHub'dagi TELEGRAM_TOKEN ni tekshiring."); process.exit(1); }
+const botUser = me.result.username;
+console.log("Bot:", "@" + botUser);
+if (!data.settings.main || data.settings.main.bot !== botUser) {
+  await db.collection("settings").doc("main").set({ bot: botUser }, { merge: true });
+  console.log("Saytga bot nomi yozildi.");
+}
+
 // 1) Ulanishlar
 const stRef = db.collection("botstate").doc("tg");
 const st = (await stRef.get()).data() || {};
@@ -36,7 +46,12 @@ for (const u of up.result || []) {
   const m = u.message; if (!m || !m.text || !m.chat) continue;
   const chat = String(m.chat.id), who = [m.from && m.from.first_name, m.from && m.from.last_name].filter(Boolean).join(" ");
   const [cmd, arg] = m.text.trim().split(/\s+/);
-  if (cmd === "/start" && arg && data.students[arg]) {
+  if (cmd === "/start" && arg === "test") {
+    // Sinov: hech qaysi o'quvchiga ulanmaydi, ota-onalarga hech narsa bormaydi
+    await db.collection("botstate").doc("test").set({ chat, who, at: new Date().toISOString() });
+    await api("sendMessage", { chat_id: chat, text: `✅ Sinov: bot ishlayapti va bazaga ulandi.\n\nTo'lov qabul qilinganda ota-onaga shunday xabar boradi:\n\nAssalomu alaykum! To'lov qabul qilindi ✅\nNamuna o'quvchi, "Podgotovka A" kursi\n12 talik davr: 23.10.2026 – 18.11.2026\nTo'landi: 550 000 so'm (03.11.2026, Naqd)\nShu davr to'liq to'landi.\nKeyingi to'lov kuni: 20.11.2026\n\nHurmat bilan, ${center}` });
+    console.log("Sinov ulanishi qabul qilindi.");
+  } else if (cmd === "/start" && arg && data.students[arg]) {
     await db.collection("students").doc(arg).update({ [`tg.${chat}`]: { name: who, at: new Date().toISOString().slice(0, 10) } });
     changed = true;
     await api("sendMessage", { chat_id: chat, text: `Rahmat! Siz ${data.students[arg].name} uchun to'lov eslatmalariga ulandingiz. To'lov kuni yaqinlashganda shu yerga xabar keladi.\n\nTo'xtatish uchun: /stop\n\n${center}` });
