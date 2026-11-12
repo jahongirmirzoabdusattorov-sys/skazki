@@ -49,7 +49,7 @@ for (const u of up.result || []) {
   const m = u.message; if (!m || !m.text || !m.chat) continue;
   const chat = String(m.chat.id), who = [m.from && m.from.first_name, m.from && m.from.last_name].filter(Boolean).join(" ");
   const [cmd, arg] = m.text.trim().split(/\s+/);
-  if (cmd === "/start" && arg === "test") {
+  if ((cmd === "/start" && arg === "test") || /^\/?test$/i.test(m.text.trim())) {
     // Sinov: hech qaysi o'quvchiga ulanmaydi, ota-onalarga hech narsa bormaydi
     await db.collection("botstate").doc("test").set({ chat, who, at: new Date().toISOString() });
     await api("sendMessage", { chat_id: chat, text: `✅ Sinov: bot ishlayapti va bazaga ulandi.\n\nTo'lov qabul qilinganda ota-onaga shunday xabar boradi:\n\nAssalomu alaykum! To'lov qabul qilindi ✅\nNamuna o'quvchi, "Podgotovka A" kursi\n12 talik davr: 23.10.2026 – 18.11.2026\nTo'landi: 550 000 so'm (03.11.2026, Naqd)\nShu davr to'liq to'landi.\nKeyingi to'lov kuni: 20.11.2026\n\nHurmat bilan, ${center}` });
@@ -60,6 +60,7 @@ for (const u of up.result || []) {
     await api("sendMessage", { chat_id: chat, text: `Rahmat! Siz ${data.students[arg].name} uchun to'lov eslatmalariga ulandingiz. To'lov kuni yaqinlashganda shu yerga xabar keladi.\n\nTo'xtatish uchun: /stop\n\n${center}` });
   } else if (cmd === "/start") {
     await api("sendMessage", { chat_id: chat, text: `Assalomu alaykum! Ulanish uchun ${center} yuborgan maxsus havolani bosing.` });
+    console.log("Havolasiz /start keldi.");
   } else if (cmd === "/stop") {
     for (const [id, s] of Object.entries(data.students)) if (s.tg && s.tg[chat]) await db.collection("students").doc(id).update({ [`tg.${chat}`]: FieldValue.delete() });
     changed = true;
