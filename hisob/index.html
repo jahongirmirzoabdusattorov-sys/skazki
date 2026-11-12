@@ -338,21 +338,33 @@ function tHours(c,g,m){
   h=Math.round(h*100)/100;
   return{h,txt:DAYS.filter(([w])=>per[w]).map(([w,l])=>`${l} ${per[w].n}×${per[w].e}`).join(", ")};
 }
+/* Guruhning shu oydagi ulushi: 12 darslik davr oylarga bo'linsa (masalan oktabrda 4, noyabrda 8 dars),
+   summa darslar soniga qarab oylarga taqsimlanadi */
+function groupMonth(gid,m){
+  if(billMode()!=="cycle")return rows(m).filter(r=>r.gid===gid).map(r=>({r,f:1,n:r.b.n}));
+  const out=[];
+  for(let k=-4;k<=0;k++)for(const r of rows(shift(m,k))){
+    if(r.gid!==gid)continue;
+    const all=r.b.all||[],inM=all.filter(d=>d.slice(0,7)===m).length;
+    if(all.length&&inM)out.push({r,f:inM/all.length,n:inM});
+  }
+  return out;
+}
 function teacherPay(tid,t,m){
   const lines=[];let total=0;
   const terms=tTerms(Object.assign({id:tid},t),m);
   for(const[gid,c]of Object.entries(terms)){
     const g=S.groups[gid];if(!g)continue;
-    const R=rows(m).filter(r=>r.gid===gid),n=activeDates(g,m).length;
+    const R=groupMonth(gid,m),n=activeDates(g,m).length;
     if(c.type==="fixed"){total+=c.rate;lines.push({name:g.name,detail:"Oylik summa",sum:c.rate});continue}
     if(!R.length)continue;
     if(c.type==="hour"){const H=tHours(c,g,m),a=H.h*c.rate;total+=a;lines.push({name:g.name,detail:`${H.txt} = ${H.h} soat × ${money(c.rate)}`,sum:a})}
     else if(c.type==="size"){
-      const cnt=new Set(R.map(r=>r.sid)).size,rate=cnt>c.limit?c.large:c.small;
+      const cnt=new Set(R.map(x=>x.r.sid)).size,rate=cnt>c.limit?c.large:c.small;
       if(c.unit==="month"){total+=rate;lines.push({name:g.name,detail:`${cnt} nafar: oyiga`,sum:rate})}
       else{const H=tHours(c,g,m),a=H.h*rate;total+=a;lines.push({name:g.name,detail:`${cnt} nafar: ${H.txt} = ${H.h} soat × ${money(rate)}`,sum:a})}
     }
-    else{const base=R.reduce((a,r)=>a+(c.base==="billed"?r.b.total:got(r)),0),a=base*c.pct/100;total+=a;lines.push({name:g.name,detail:`Foiz: ${money(base)} × ${c.pct}%`,sum:a})}
+    else{const base=roundSum(R.reduce((a,x)=>a+(c.base==="billed"?x.r.b.total:got(x.r))*x.f,0)),a=base*c.pct/100;total+=a;lines.push({name:g.name,detail:`Foiz: ${money(base)} × ${c.pct}%`,sum:a})}
   }
   return{lines,total:roundSum(total)};
 }
