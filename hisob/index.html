@@ -465,8 +465,32 @@ function grpView(){
     return `<article class="card"><div class="top"><div><h2>${esc(g.name)}</h2><div class="lbl">${esc(dayNames(v.days))}${g.time?" · "+esc(g.time):""}${tName(g)?" · "+esc(tName(g)):""} · ${cnt} o'quvchi</div></div>${o?`<button class="btn" onclick="grpSheet('${id}')">Tahrirlash</button>`:""}</div>
     <div class="calc"><div><span>Oylik narx (${v.pack} dars)</span><span>${money(v.price)}</span></div>${r.extra?`<div><span>Qo'shimcha ${r.extra} dars</span><span>${money(r.total-v.price)}</span></div>`:""}<div class="t"><span>${mName(month)}: ${n} dars</span><span>${money(r.total)} so'm</span></div></div>
     <div class="lbl">${o?"Dars bo'lmagan kunni bosib bekor qiling:":"Dars kunlari (bekor qilinganlari qizil):"}</div>
-    <div class="dates">${all.map(d=>`<button class="date ${c.includes(d)?"x":""}" aria-label="${d}" ${o?`onclick="toggleDay('${id}','${d}')"`:"disabled"}>${+d.slice(8)}</button>`).join("")}</div></article>`}).join("");
+    <div class="dates">${all.map(d=>`<button class="date ${c.includes(d)?"x":""}" aria-label="${d}" ${o?`onclick="toggleDay('${id}','${d}')"`:"disabled"}>${+d.slice(8)}</button>`).join("")}</div>
+    <button class="btn wide" onclick="grpAdd('${id}')">O'quvchi qo'shish</button></article>`}).join("");
   return monthBar()+(own()?`<button class="btn pri wide" onclick="grpSheet()">Guruh qo'shish</button>`:"")+(cards||`<div class="empty">Hali guruh yo'q.</div>`);
+}
+/* Guruh kartasidan o'quvchi qo'shish */
+let PREG=null;
+function grpAdd(gid){
+  const g=S.groups[gid],L=Object.entries(S.students).filter(([,s])=>!(gid in stuCourses(s,month))&&!s.end).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  openSheet(`<h2>${esc(g.name)}: o'quvchi qo'shish</h2>
+  <button class="btn pri wide" onclick="PREG='${gid}';stuSheet()">Yangi o'quvchi kiritish</button>
+  ${own()&&L.length?`<div class="lbl">Yoki ro'yxatdagi o'quvchilarni belgilang:</div>
+  <input id="gaq" type="search" placeholder="Ism bo'yicha qidirish" aria-label="Ism bo'yicha qidirish" style="min-height:44px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:16px" oninput="const q=this.value.trim().toLowerCase();document.querySelectorAll('#gal .check').forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?'flex':'none')">
+  <div class="list" id="gal">${L.map(([sid,s])=>`<label class="check"><input type="checkbox" value="${sid}"><span>${esc(s.name)}${s.phone?` <span class="lbl">${esc(s.phone)}</span>`:""}</span></label>`).join("")}</div>
+  <p class="note">Chegirma 0% bilan qo'shiladi. Kerak bo'lsa, o'quvchi kartasida yozasiz. ${mName(month)} oyidan boshlab qo'llanadi.</p>
+  <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" onclick="grpAddSave('${gid}')">Qo'shish</button></div>`:`<button class="btn wide" onclick="closeSheet()">Yopish</button>`}`);
+}
+function grpAddSave(gid){
+  if(!own())return;
+  const ids=[...document.querySelectorAll("#gal input:checked")].map(i=>i.value);
+  if(!ids.length){toast("O'quvchini belgilang");return}
+  for(const sid of ids){
+    const old=S.students[sid],groups=Object.assign({},stuCourses(old,month),{[gid]:0});
+    const base=old.versions&&old.versions.length?old.versions:[{from:"2000-01",groups:stuCourses(old,month)}];
+    put("students",sid,Object.assign({},old,{versions:[...base.filter(x=>x.from!==month),{from:month,groups}],groupIds:Object.keys(groups)}));
+  }
+  closeSheet();toast(ids.length+" ta o'quvchi qo'shildi");
 }
 function toggleDay(id,d){if(!own())return;const g=S.groups[id],c=new Set(g.cancelled||[]);c.has(d)?c.delete(d):c.add(d);put("groups",id,Object.assign({},g,{cancelled:[...c]}))}
 function stuView(){
@@ -647,6 +671,7 @@ function paySheet(sid,gid,m,k){
   <label class="f">Bergan puli (qisman bo'lsa, shu summani yozing)<input id="pa" inputmode="numeric" value="${left?money(left):""}" oninput="fmtMoney(this)"></label>
   <div class="two"><label class="f">Sana<input id="pd" type="date" value="${today()}"></label><label class="f">Usul<select id="pm"><option>Naqd</option><option>Karta</option><option>O'tkazma</option></select></label></div>
   <div class="acts"><button class="btn" onclick="closeSheet()">Yopish</button><button class="btn pri" onclick="savePay('${sid}','${gid}','${m}',${b.k||0})">To'lovni yozish</button></div>
+  ${b.cyc?`<button class="btn wide" onclick="msgSheet('${sid}','info','${gid}','${m}',${b.k})">Ota-onaga: qaysi sanadan qaysi sanagacha</button>`:""}
   ${b.cyc&&left?`<button class="btn wide" onclick="msgSheet('${sid}','due','${gid}','${m}',${b.k})">Ota-onaga to'lov eslatmasi</button>`:""}`);
 }
 function toggleAbs(sid,gid,d,m,k){
@@ -674,12 +699,17 @@ function upcomingBox(){
   return `<div class="ghead"><h2>To'lov kuni keldi yoki yaqin</h2><span class="lbl">${L.length} ta</span></div><div class="list">${L.map(r=>`<div class="row"><button class="sublink" style="border:0;padding:0;min-height:44px;color:var(--ink)" onclick="paySheet('${r.sid}','${r.gid}','${r.m}',${r.b.k})"><div class="name">${esc(r.s.name)}</div><div class="lbl">${esc(r.g.name)} · ${money(r.left)} so'm · <span class="pill ${r.b.cyc<t?"bad":"warn"}">${when(r.b.cyc)}</span></div></button><button class="btn" onclick="msgSheet('${r.sid}','due','${r.gid}','${r.m}',${r.b.k})">Xabar</button></div>`).join("")}</div>`;
 }
 function phoneIntl(p){let d=String(p||"").replace(/\D/g,"");if(d.length===9)d="998"+d;return d.length>=11?d:""}
+function fullD(d){return d.slice(8)+"."+d.slice(5,7)+"."+d.slice(0,4)}
 function msgSheet(sid,kind,gid,m,k){
   C={};
   const s=S.students[sid];let txt;
   if(kind==="due"){
     const r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&x.b.k===k);if(!r){closeSheet();return}
-    txt=`Assalomu alaykum! ${s.name}ning "${r.g.name}" kursi bo'yicha navbatdagi ${r.b.pack} ta dars ${fmtD(r.b.cyc)} kuni boshlanadi. To'lov summasi: ${money(r.left)} so'm.`;
+    txt=`Assalomu alaykum! ${s.name}ning "${r.g.name}" kursi bo'yicha navbatdagi ${r.b.pack} ta dars ${fullD(r.b.cyc)} kuni boshlanadi (${fullD(r.b.cyc)} – ${fullD(r.b.last)}). To'lov summasi: ${money(r.left)} so'm.`;
+  }else if(kind==="info"){
+    const r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&x.b.k===k);if(!r){closeSheet();return}
+    const b=r.b,paid=got(r);
+    txt=`Assalomu alaykum! ${s.name}, "${r.g.name}" kursi.\nTo'lov davri: ${fullD(b.cyc)} – ${fullD(b.last)} (${b.n} ta dars).\nSumma: ${money(b.total)} so'm${b.pct?` (${b.pct}% chegirma bilan)`:""}.\n${r.left?`To'langan: ${money(paid)} so'm, qoldi: ${money(r.left)} so'm.`:`To'langan: ${money(paid)} so'm. Rahmat!`}${b.next?`\nKeyingi to'lov kuni: ${fullD(b.next)}.`:""}\nDarsga kelinmagan kun 12 taga kirmaydi, davr shunga qarab uzayadi.`;
   }else{
     const d=debt(sid,month);txt=`Assalomu alaykum! ${s.name}ning o'qish to'lovi bo'yicha ${money(d.total)} so'm qarzdorlik bor. Iltimos, to'lovni amalga oshiring.`;
   }
@@ -725,10 +755,10 @@ function saveGrp(id){
 }
 function togC(el){const s=el.closest(".course").querySelector(".sub");if(s)s.style.display=el.checked?"flex":"none"}
 function stuSheet(id,leadId){
-  C={};LEAD=leadId||null;
+  C={};LEAD=leadId||null;const preg=PREG;PREG=null;
   const pre=LEAD?S.leads[LEAD]:null;
   const s=id?S.students[id]:null,L=Object.entries(S.groups).sort((a,b)=>a[1].name.localeCompare(b[1].name));
-  const cur=s?stuCourses(s,month):pre&&pre.gid&&S.groups[pre.gid]?{[pre.gid]:0}:{},rs=id?(byStu(month)[id]||[]):[];
+  const cur=s?stuCourses(s,month):pre&&pre.gid&&S.groups[pre.gid]?{[pre.gid]:0}:preg&&S.groups[preg]?{[preg]:0}:{},rs=id?(byStu(month)[id]||[]):[];
   const pctOf=g=>{if(cur[g]!==null&&cur[g]!==undefined)return +cur[g]||"";const r=rs.find(x=>x.gid===g);return r&&r.b.pct||""};
   const d=id?debt(id,month):null;
   openSheet(`<h2>${s?"O'quvchi":"Yangi o'quvchi"}</h2>
