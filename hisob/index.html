@@ -220,6 +220,12 @@ function stuCourses(s,m){
   if(s.versions&&s.versions.length)return version(s,m).groups||{};
   const o={};(s.groupIds||[]).forEach(g=>o[g]=null);return o;
 }
+/* O'quvchining oxirgi to'lov sanasi va summasi */
+function lastPay(sid){
+  let b=null;for(const p of Object.values(S.payments))if(p.sid===sid&&p.date&&(!b||p.date>b.date))b=p;
+  return b;
+}
+function lastTxt(sid){const p=lastPay(sid);return p?`oxirgi to'lov ${fmtD(p.date)}`:"to'lov yo'q"}
 function famKey(s){return(s.family||"").trim().toLowerCase()}
 function discount(s,count,famCount,set){
   if(s.disc!==undefined&&s.disc!==null&&s.disc!=="")return{pct:+s.disc,why:"alohida"};
@@ -484,7 +490,7 @@ function drawRows(){
     const seen=[...new Set(R.map(r=>r.sid))].sort((a,b)=>S.students[a].name.localeCompare(S.students[b].name));
     el.innerHTML=`<div class="list">`+seen.map(sid=>{
       const d=debt(sid,month),c=d.cur.length;
-      return `<button class="row" onclick="debtSheet('${sid}')"><div><div class="name">${esc(S.students[sid].name)}</div><div class="lbl">${c} ta kurs${d.prevLeft?` · oldingi qarz ${money(d.prevLeft)}`:""}${creditOut(sid,month)?` · keyingi oyga ${money(creditOut(sid,month))}`:""}</div></div><div class="right"><div class="val">${money(d.total)}</div>${d.total?`<span class="pill bad">Jami qarz</span>`:`<span class="pill good">Qarzi yo'q</span>`}</div></button>`}).join("")+`</div>`;
+      return `<button class="row" onclick="debtSheet('${sid}')"><div><div class="name">${esc(S.students[sid].name)}</div><div class="lbl">${c} ta kurs · ${lastTxt(sid)}${d.prevLeft?` · oldingi qarz ${money(d.prevLeft)}`:""}${creditOut(sid,month)?` · keyingi oyga ${money(creditOut(sid,month))}`:""}</div></div><div class="right"><div class="val">${money(d.total)}</div>${d.total?`<span class="pill bad">Jami qarz</span>`:`<span class="pill good">Qarzi yo'q</span>`}</div></button>`}).join("")+`</div>`;
     return;
   }
   const by={};R.forEach(r=>(by[r.gid]=by[r.gid]||[]).push(r));
@@ -556,7 +562,7 @@ function telA(p){return p?`<a href="tel:+${phoneIntl(p)||p.replace(/\D/g,"")}" s
 function drawCon(){
   const el=document.getElementById("con");if(!el)return;
   const L=conList();
-  el.innerHTML=`<div class="ghead"><h2>${L.length} ta o'quvchi</h2></div>`+(L.length?`<div class="list">${L.map(x=>`<div class="row"><div style="min-width:0"><button class="sublink" style="border:0;padding:0;min-height:0;width:auto" onclick="stuSheet('${x.id}')">${esc(x.s.name)}</button><div class="lbl">${x.s.parent?esc(x.s.parent)+" · ":""}${esc(x.gs.map(g=>S.groups[g].name).join(", ")||"Guruhsiz")}${x.s.end?" · ketgan":""}</div></div><div class="right" style="display:flex;flex-direction:column;gap:4px">${telA(x.s.phone)||`<span class="lbl">telefon yo'q</span>`}${telA(x.s.phone2)}</div></div>`).join("")}</div>`:`<div class="empty">Topilmadi.</div>`);
+  el.innerHTML=`<div class="ghead"><h2>${L.length} ta o'quvchi</h2></div>`+(L.length?`<div class="list">${L.map(x=>`<div class="row"><div style="min-width:0"><button class="sublink" style="border:0;padding:0;min-height:0;width:auto" onclick="stuSheet('${x.id}')">${esc(x.s.name)}</button><div class="lbl">${x.s.parent?esc(x.s.parent)+" · ":""}${esc(x.gs.map(g=>S.groups[g].name).join(", ")||"Guruhsiz")}${x.s.end?" · ketgan":""} · ${lastTxt(x.id)}</div></div><div class="right" style="display:flex;flex-direction:column;gap:4px">${telA(x.s.phone)||`<span class="lbl">telefon yo'q</span>`}${telA(x.s.phone2)}</div></div>`).join("")}</div>`:`<div class="empty">Topilmadi.</div>`);
 }
 async function copyCon(){
   const t=conList().map(x=>[x.s.name,x.s.parent,x.s.phone,x.s.phone2,x.gs.map(g=>S.groups[g].name).join(", ")].filter(Boolean).join(" | ")).join("\n");
@@ -564,7 +570,7 @@ async function copyCon(){
 }
 function csvCon(){
   const q=v=>'"'+String(v||"").replace(/"/g,'""')+'"';
-  const rows=[["Ism familiya","Ota-ona","Telefon","Qo'shimcha telefon","Guruhlar","Boshlagan sana","Ketgan sana"]].concat(conList().map(x=>[x.s.name,x.s.parent,x.s.phone,x.s.phone2,x.gs.map(g=>S.groups[g].name).join(", "),x.s.start,x.s.end]));
+  const rows=[["Ism familiya","Ota-ona","Telefon","Qo'shimcha telefon","Guruhlar","Boshlagan sana","Ketgan sana","Oxirgi to'lov"]].concat(conList().map(x=>[x.s.name,x.s.parent,x.s.phone,x.s.phone2,x.gs.map(g=>S.groups[g].name).join(", "),x.s.start,x.s.end,(lastPay(x.id)||{}).date||""]));
   const blob=new Blob(["\ufeff"+rows.map(r=>r.map(q).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="oquvchilar-telefonlar.csv";document.body.appendChild(a);a.click();a.remove();
 }
@@ -574,7 +580,7 @@ function stuView(){
   const list=L.map(([id,s])=>{
     const gn=Object.keys(stuCourses(s,month)).map(g=>S.groups[g]&&S.groups[g].name).filter(Boolean).join(", ");
     const d=debt(id,month),nx=s.end?"":Object.keys(stuCourses(s,month)).map(g=>{const p=payInfo(id,g);return p&&p.next}).filter(Boolean).sort()[0];
-    return `<button class="row" onclick="stuSheet('${id}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${esc(gn||"Guruhsiz")}${s.family?" · "+esc(s.family):""}${s.end?" · ketgan":""}${nx?" · to'lov "+fmtD(nx):""}</div></div><div class="right"><div class="val">${money(d.total)}</div><div class="lbl">${d.total?"qarz":"qarzi yo'q"}</div></div></button>`}).join("");
+    return `<button class="row" onclick="stuSheet('${id}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${esc(gn||"Guruhsiz")}${s.family?" · "+esc(s.family):""}${s.end?" · ketgan":""}${nx?" · to'lov kuni "+fmtD(nx):""} · ${lastTxt(id)}</div></div><div class="right"><div class="val">${money(d.total)}</div><div class="lbl">${d.total?"qarz":"qarzi yo'q"}</div></div></button>`}).join("");
   return stuTabs()+monthBar()+`<button class="btn pri wide" onclick="stuSheet()">O'quvchi qo'shish</button><button class="btn wide" onclick="setSheet()">Sozlamalar va hisob</button>`+(list?`<div class="list">${list}</div>`:`<div class="empty">Hali o'quvchi yo'q.</div>`);
 }
 
@@ -730,7 +736,7 @@ function debtSheet(sid){
   C={};
   const s=S.students[sid],d=debt(sid,month);
   const item=r=>`<button class="row" onclick="paySheet('${sid}','${r.gid}','${r.m}',${r.b.k||0})"><div><div class="name">${esc(r.g.name)}</div><div class="lbl">${r.b.cyc?fmtD(r.b.cyc)+"–"+fmtD(r.b.last):mName(r.m)} · ${money(r.b.total)} so'm${r.b.pct?` (−${r.b.pct}%)`:""}</div></div><div class="right"><div class="val">${money(r.left)}</div>${r.left?`<span class="pill bad">Qarz</span>`:`<span class="pill good">To'langan</span>`}</div></button>`;
-  openSheet(`<h2>${esc(s.name)}</h2><p class="note">${s.phone?esc(s.phone)+" · ":""}${mName(month)} holatiga</p>
+  openSheet(`<h2>${esc(s.name)}</h2><p class="note">${s.phone?esc(s.phone)+" · ":""}${mName(month)} holatiga · ${lastTxt(sid)}</p>
   <div class="calc"><div><span>Shu oy, barcha kurslar</span><span>${money(d.curLeft)}</span></div><div><span>Oldingi oylardan</span><span>${money(d.prevLeft)}</span></div><div class="t"><span>Jami qarz</span><span>${money(d.total)} so'm</span></div>${creditOut(sid,month)?`<div><span>Keyingi oyga o'tadi</span><span>${money(creditOut(sid,month))}</span></div>`:""}</div>
   ${d.cur.length?`<div class="list">${d.cur.map(item).join("")}</div>`:""}
   ${d.prev.length?`<div class="lbl">Oldingi oylar</div><div class="list">${d.prev.map(item).join("")}</div>`:""}
@@ -873,7 +879,7 @@ function stuSheet(id,leadId){
   const pctOf=g=>{if(cur[g]!==null&&cur[g]!==undefined)return +cur[g]||"";const r=rs.find(x=>x.gid===g);return r&&r.b.pct||""};
   const d=id?debt(id,month):null;
   openSheet(`<h2>${s?"O'quvchi":"Yangi o'quvchi"}</h2>
-  ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm</button>`:""}
+  ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm${(p=>p?` · oxirgi to'lov ${fullD(p.date)}, ${money(p.amount)} so'm`:" · hali to'lov yo'q")(lastPay(id))}</button>`:""}
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
   <div class="two"><label class="f">Ota-ona telefoni<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label><label class="f">Qo'shimcha telefon<input id="sp2" inputmode="tel" value="${esc(s?s.phone2||"":"")}"></label></div>
   <label class="f">Ota-ona ismi<input id="spn" value="${esc(s?s.parent||"":"")}"></label>
