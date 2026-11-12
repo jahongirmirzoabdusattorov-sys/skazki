@@ -17,7 +17,7 @@ export function loadApp(htmlPath, data) {
   ctx.window = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
   vm.runInContext(code + `
-;globalThis.API={S,rows,rowPays,debt,famDue,today,dshift,shift,fullD,fmtD,money,center,billMode,phKey,trackFrom,resetC(){C={}}};`, ctx);
+;globalThis.API={S,rows,rowPays,courseHist,stuCourses,debt,famDue,today,dshift,shift,fullD,fmtD,money,center,billMode,phKey,trackFrom,resetC(){C={}}};`, ctx);
   const A = ctx.API;
   for (const k of Object.keys(A.S)) A.S[k] = data[k] || {};
   A.resetC();
@@ -74,4 +74,28 @@ export function receiptText(A, pid) {
   if (r && r.b.next) L.push(`Keyingi to'lov kuni: ${A.fullD(r.b.next)}`);
   if (A.center()) L.push(`\nHurmat bilan, ${A.center()}`);
   return L.join("\n");
+}
+
+// Hozirgi holat: shu chatga ulangan o'quvchilar (va bir xil telefonli aka-ukalar) qarzi va keyingi to'lov kuni
+export function statusText(A, chat) {
+  const S = A.S, t = A.today(), m0 = t.slice(0, 7), out = [];
+  const mine = Object.entries(S.students).filter(([, s]) => s.tg && s.tg[chat]);
+  const keys = new Set(mine.map(([, s]) => A.phKey(s.phone)).filter(Boolean));
+  const fam = Object.entries(S.students).filter(([id, s]) => mine.some(([x]) => x === id) || keys.has(A.phKey(s.phone)));
+  let total = 0;
+  for (const [sid, s] of fam) {
+    if (s.end && s.end < t) continue;
+    for (const gid of Object.keys(A.stuCourses(s, m0))) {
+      const g = S.groups[gid]; if (!g) continue;
+      const H = A.courseHist(sid, gid).filter(r => r.m >= A.trackFrom());
+      const debt = H.filter(r => r.due && r.left > 0), next = H.find(r => !r.due);
+      const sum = debt.reduce((a, r) => a + r.left, 0); total += sum;
+      let line = `• ${s.name}, "${g.name}": `;
+      line += sum ? `qarz ${A.money(sum)} so'm (to'lov kuni ${debt.map(r => A.fullD(r.b.cyc || r.m + "-01")).join(", ")})` : "qarz yo'q";
+      if (next && next.b.cyc) line += `\n  Keyingi to'lov kuni: ${A.fullD(next.b.cyc)}, ${A.money(next.left)} so'm`;
+      out.push(line);
+    }
+  }
+  if (!out.length) return "";
+  return `Hozirgi holat (${A.fullD(t)}):\n\n${out.join("\n\n")}${total ? `\n\nJami qarz: ${A.money(total)} so'm` : ""}${A.center() ? `\n\nHurmat bilan, ${A.center()}` : ""}`;
 }

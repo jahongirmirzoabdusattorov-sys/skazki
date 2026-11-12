@@ -2,7 +2,7 @@
 // 1) ota-onalarning "Start" bosishiga darhol javob beradi va o'quvchiga bog'laydi;
 // 2) to'lov yozilganda ota-onaga darhol xabar yuboradi;
 // 3) Toshkent vaqti bilan 08:00 dan keyin kuniga bir marta to'lov eslatmalarini yuboradi.
-import { loadApp, dailyMessages, receiptText } from "./logic.mjs";
+import { loadApp, dailyMessages, receiptText, statusText } from "./logic.mjs";
 
 const TOKEN = process.env.TELEGRAM_TOKEN, SA = process.env.FIREBASE_SA;
 if (!TOKEN || !SA) { console.log("TELEGRAM_TOKEN yoki FIREBASE_SA sozlanmagan — bot ishlamadi."); process.exit(0); }
@@ -62,10 +62,16 @@ async function handle(u) {
     const s = data.students[arg];
     await db.collection("students").doc(arg).update({ [`tg.${chat}`]: { name: who, at: new Date().toISOString().slice(0, 10) } });
     console.log("Ulandi:", s.name);
-    await api("sendMessage", { chat_id: chat, text: `Rahmat! Siz ${s.name} uchun to'lov eslatmalariga ulandingiz. To'lov kuni yaqinlashganda va to'lov qabul qilinganda shu yerga xabar keladi.\n\nTo'xtatish uchun: /stop\n\n${center()}` });
+    await api("sendMessage", { chat_id: chat, text: `Rahmat! Siz ${s.name} uchun to'lov eslatmalariga ulandingiz. To'lov kuni yaqinlashganda va to'lov qabul qilinganda shu yerga xabar keladi.\n\nHozirgi holatni ko'rish: /holat\nTo'xtatish uchun: /stop\n\n${center()}` });
+    data.students[arg] = { ...s, tg: { ...(s.tg || {}), [chat]: { name: who } } };
+    const st = statusText(app(), chat); if (st) await api("sendMessage", { chat_id: chat, text: st });
   } else if (cmd === "/start") {
     console.log("Havolasiz /start keldi.");
     await api("sendMessage", { chat_id: chat, text: `Assalomu alaykum! Bu ${center()} to'lov eslatmalari boti.\n\nUlanish uchun markaz sizga yuborgan maxsus havolani bosing (u https://t.me/${botUser}?start=... ko'rinishida bo'ladi). Havolani markazdan so'rashingiz mumkin.` });
+  } else if (cmd === "/holat") {
+    const st = statusText(app(), chat);
+    await api("sendMessage", { chat_id: chat, text: st || `Siz hali hech qaysi o'quvchiga ulanmagansiz. Markaz yuborgan maxsus havolani bosing.` });
+    console.log("/holat so'raldi.");
   } else if (cmd === "/stop") {
     for (const [id, s] of Object.entries(data.students)) if (s.tg && s.tg[chat]) await db.collection("students").doc(id).update({ [`tg.${chat}`]: FieldValue.delete() });
     console.log("/stop: ulanish o'chirildi");
