@@ -39,6 +39,8 @@ if (!data.settings.main || data.settings.main.bot !== botUser) {
 // 1) Ulanishlar
 const stRef = db.collection("botstate").doc("tg");
 const st = (await stRef.get()).data() || {};
+const wh = await api("getWebhookInfo");
+console.log("Webhook:", wh.result && wh.result.url ? "o'rnatilgan (getUpdates ishlamaydi)" : "yo'q", "| kutilayotgan:", wh.result && wh.result.pending_update_count);
 const up = await api("getUpdates", { offset: st.offset || 0, timeout: 0, allowed_updates: ["message"] });
 let offset = st.offset || 0, changed = false;
 console.log("Telegram yangilanishlar:", (up.result || []).length, up.ok ? "" : "(getUpdates xato)");
