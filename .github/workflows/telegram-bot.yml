@@ -1,0 +1,24 @@
+name: Telegram bot (to'lov eslatmalari)
+on:
+  schedule:
+    - cron: "7 * * * *"   # har soatda
+  workflow_dispatch: {}
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Asia/Tashkent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save --no-package-lock firebase-admin@12.7.0
+      - run: node bot/run.mjs
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}

@@ -226,6 +226,23 @@ function lastPay(sid){
   return b;
 }
 function lastTxt(sid){const p=lastPay(sid);return p?`oxirgi to'lov ${fmtD(p.date)}`:"to'lov yo'q"}
+/* ---- Telegram bot ---- */
+function botName(){const st=S.settings.main;return st&&st.bot||""}
+function tgCount(s){return s&&s.tg?Object.keys(s.tg).length:0}
+function tgLink(sid){return "https://t.me/"+botName()+"?start="+sid}
+function tgSheet(sid){
+  const s=S.students[sid],n=tgCount(s);
+  if(!botName()){openSheet(`<h2>Telegram bot</h2><p class="note">Avval bot ochib, uning nomini <b>O'quvchilar → Sozlamalar</b>dagi "Telegram bot nomi" maydoniga yozing.</p><button class="btn wide" onclick="closeSheet()">Yopish</button>`);return}
+  const link=tgLink(sid),txt=`Assalomu alaykum! ${s.name}ning to'lov kunlari va qarzi haqidagi eslatmalarni Telegramda olish uchun shu havolani oching va "Start" (Запустить) tugmasini bosing:\n${link}${center()?"\n\nHurmat bilan, "+center():""}`;
+  const ph=phoneIntl(s.phone),e=encodeURIComponent(txt);
+  openSheet(`<h2>Telegram: ${esc(s.name)}</h2>
+  <div class="calc"><div><span>Ulangan ota-onalar</span><span>${n?Object.values(s.tg).map(x=>esc(x.name||"")).join(", ")||n:"hali yo'q"}</span></div></div>
+  <p class="note">Havolani ota-onaga bir marta yuboring. U "Start"ni bosgach, bot shu bolaga ulanadi va har kuni ertalab kerak bo'lganda o'zi xabar yuboradi. Ulanish 1 soat ichida ko'rinadi.</p>
+  <label class="f">Xabar matni<textarea id="mt" rows="5" style="padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:16px">${esc(txt)}</textarea></label>
+  <button class="btn pri wide" onclick="copyMsg()">Matnni nusxalash</button>
+  <div class="acts"><a class="btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(txt.replace(link,""))}" target="_blank" rel="noopener">Telegram</a>${ph?`<a class="btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://wa.me/${ph}?text=${e}" target="_blank" rel="noopener">WhatsApp</a>`:""}</div>
+  <button class="btn wide" onclick="stuSheet('${sid}')">Orqaga</button>`);
+}
 function famKey(s){return(s.family||"").trim().toLowerCase()}
 function discount(s,count,famCount,set){
   if(s.disc!==undefined&&s.disc!==null&&s.disc!=="")return{pct:+s.disc,why:"alohida"};
@@ -562,7 +579,7 @@ function telA(p){return p?`<a href="tel:+${phoneIntl(p)||p.replace(/\D/g,"")}" s
 function drawCon(){
   const el=document.getElementById("con");if(!el)return;
   const L=conList();
-  el.innerHTML=`<div class="ghead"><h2>${L.length} ta o'quvchi</h2></div>`+(L.length?`<div class="list">${L.map(x=>`<div class="row"><div style="min-width:0"><button class="sublink" style="border:0;padding:0;min-height:0;width:auto" onclick="stuSheet('${x.id}')">${esc(x.s.name)}</button><div class="lbl">${x.s.parent?esc(x.s.parent)+" · ":""}${esc(x.gs.map(g=>S.groups[g].name).join(", ")||"Guruhsiz")}${x.s.end?" · ketgan":""} · ${lastTxt(x.id)}</div></div><div class="right" style="display:flex;flex-direction:column;gap:4px">${telA(x.s.phone)||`<span class="lbl">telefon yo'q</span>`}${telA(x.s.phone2)}</div></div>`).join("")}</div>`:`<div class="empty">Topilmadi.</div>`);
+  el.innerHTML=`<div class="ghead"><h2>${L.length} ta o'quvchi</h2></div>`+(L.length?`<div class="list">${L.map(x=>`<div class="row"><div style="min-width:0"><button class="sublink" style="border:0;padding:0;min-height:0;width:auto" onclick="stuSheet('${x.id}')">${esc(x.s.name)}</button><div class="lbl">${x.s.parent?esc(x.s.parent)+" · ":""}${esc(x.gs.map(g=>S.groups[g].name).join(", ")||"Guruhsiz")}${x.s.end?" · ketgan":""} · ${lastTxt(x.id)}${tgCount(x.s)?' · <span class="pill good">Telegram</span>':""}</div></div><div class="right" style="display:flex;flex-direction:column;gap:4px">${telA(x.s.phone)||`<span class="lbl">telefon yo'q</span>`}${telA(x.s.phone2)}</div></div>`).join("")}</div>`:`<div class="empty">Topilmadi.</div>`);
 }
 async function copyCon(){
   const t=conList().map(x=>[x.s.name,x.s.parent,x.s.phone,x.s.phone2,x.gs.map(g=>S.groups[g].name).join(", ")].filter(Boolean).join(" | ")).join("\n");
@@ -879,6 +896,7 @@ function stuSheet(id,leadId){
   const pctOf=g=>{if(cur[g]!==null&&cur[g]!==undefined)return +cur[g]||"";const r=rs.find(x=>x.gid===g);return r&&r.b.pct||""};
   const d=id?debt(id,month):null;
   openSheet(`<h2>${s?"O'quvchi":"Yangi o'quvchi"}</h2>
+  ${s?`<button class="sublink" onclick="tgSheet('${id}')">${tgCount(s)?`Telegram bot: ota-ona ulangan (${tgCount(s)}) ✓`:"Telegram bot: ota-onaga ulanish havolasini yuborish"}</button>`:""}
   ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm${(p=>p?` · oxirgi to'lov ${fullD(p.date)}, ${money(p.amount)} so'm`:" · hali to'lov yo'q")(lastPay(id))}</button>`:""}
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
   <div class="two"><label class="f">Ota-ona telefoni<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label><label class="f">Qo'shimcha telefon<input id="sp2" inputmode="tel" value="${esc(s?s.phone2||"":"")}"></label></div>
@@ -919,7 +937,7 @@ function saveStu(id){
   }
   const newSid=id||uid();
   if(LEAD&&S.leads[LEAD]){put("leads",LEAD,Object.assign({},S.leads[LEAD],{status:"done",sid:newSid}));LEAD=null}
-  put("students",newSid,{name,phone:document.getElementById("sp").value.trim(),phone2:document.getElementById("sp2").value.trim(),parent:document.getElementById("spn").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),anchor:document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"",family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
+  put("students",newSid,{...(old&&old.tg?{tg:old.tg}:{}),name,phone:document.getElementById("sp").value.trim(),phone2:document.getElementById("sp2").value.trim(),parent:document.getElementById("spn").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),anchor:document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"",family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
   closeSheet();
 }
 function setSheet(){
@@ -934,6 +952,7 @@ function setSheet(){
   openSheet(`<h2>Sozlamalar</h2>
   <label class="f">To'lov tartibi<select id="xm"><option value="cycle" ${billMode()==="cycle"?"selected":""}>12 darsdan: o'quvchi kelgan kunidan sanaladi</option><option value="month" ${billMode()==="month"?"selected":""}>Oylik: har oy 1-sanadan</option></select></label>
   <label class="f">Markaz nomi (ota-onaga xabar oxirida)<input id="xc" value="${esc(center())}"></label>
+  <label class="f">Telegram bot nomi (masalan LeadershipLH_bot)<input id="xb" autocapitalize="off" spellcheck="false" placeholder="@ belgisiz" value="${esc(botName())}"></label>
   <label class="f">Qarzni qaysi oydan hisoblash<input id="xt" type="month" value="${trackFrom()}"></label>
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" onclick="saveSet()">Saqlash</button></div>
   ${au?`${acct}
@@ -945,7 +964,7 @@ function setSheet(){
 function saveSet(){
   if(!own())return;
   const st=S.settings.main,versions=st&&st.versions?st.versions:[{from:"2000-01",family:5,multi:10}];
-  put("settings","main",{trackFrom:document.getElementById("xt").value||trackFrom(),versions,mode:document.getElementById("xm").value,center:document.getElementById("xc").value.trim()});
+  put("settings","main",Object.assign({},st||{},{trackFrom:document.getElementById("xt").value||trackFrom(),versions,mode:document.getElementById("xm").value,center:document.getElementById("xc").value.trim(),bot:document.getElementById("xb").value.trim().replace(/^@/,"").replace(/^https?:\/\/t\.me\//,"")}));
   closeSheet();
 }
 
