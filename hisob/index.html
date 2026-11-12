@@ -231,7 +231,38 @@ function billMode(){const st=S.settings.main;return st&&st.mode||"cycle"}
 function center(){const st=S.settings.main;return st&&st.center!==undefined?st.center:"Leadership Learning House"}
 function fmtD(d){return +d.slice(8)+"."+d.slice(5,7)}
 /* 12 darslik davrlar: o'quvchi kelgan kunidan sanaladi, kelmagan dars sanalmaydi */
+/* To'lov kuni bog'langan kurs (oila yoki o'quvchining boshqa kursi): shu kursning 12 darsi boshlangan kun
+   hammasi uchun umumiy to'lov kuni bo'ladi, bog'langan kurs esa shu oraliqdagi darslari soniga qarab hisoblanadi */
+function anchorOf(sid,gid){
+  const s=S.students[sid],a=s&&s.anchor;if(!a||a===sid+"|"+gid)return null;
+  const[as,ag]=a.split("|"),x=S.students[as];
+  if(!x||!S.groups[ag])return null;
+  return[as,ag];
+}
 function cycles(sid,gid,m){
+  const an=anchorOf(sid,gid);
+  if(!an)return baseCycles(sid,gid,m);
+  const s=S.students[sid],g=S.groups[gid],key="z"+sid+"|"+gid+"|"+m;
+  if(C[key])return C[key];
+  const st=s.start||trackFrom()+"-01",ac=baseCycles(an[0],an[1],m),out=[];
+  if(!ac.length)return C[key]=baseCycles(sid,gid,m);
+  const own=[],last=ac[ac.length-1].next||ac[ac.length-1].last;
+  for(let mm=st.slice(0,7);mm<=last.slice(0,7);mm=shift(mm,1)){
+    if(!(gid in stuCourses(s,mm)))continue;
+    for(const d of activeDates(g,mm))if(d>=st&&(!s.end||d<=s.end))own.push(d);
+  }
+  /* Asosiy kurs boshlanishidan oldingi darslar: birinchi to'lov o'quvchining birinchi darsida */
+  const pre=own.filter(d=>d<ac[0].start);
+  if(pre.length)out.push({start:pre[0],last:pre[pre.length-1],n:pre.length,pack:version(g,pre[0].slice(0,7)).pack,anch:true});
+  for(const c of ac){
+    const ch=own.filter(d=>d>=c.start&&(c.next?d<c.next:d<=c.last));
+    if(!ch.length)continue;
+    out.push({start:c.start<st?ch[0]:c.start,last:ch[ch.length-1],n:ch.length,pack:version(g,ch[0].slice(0,7)).pack,anch:true});
+  }
+  out.forEach((c,i)=>{c.k=i+1;c.next=out[i+1]?out[i+1].start:""});
+  return C[key]=out;
+}
+function baseCycles(sid,gid,m){
   const s=S.students[sid],g=S.groups[gid],tm=today().slice(0,7),hz=shift(m>tm?m:tm,4),key="y"+sid+"|"+gid+"|"+hz;
   if(C[key])return C[key];
   const st=s.start||trackFrom()+"-01",miss=(s.absent&&s.absent[gid])||[],dates=[];
@@ -246,12 +277,12 @@ function cycles(sid,gid,m){
 }
 function cycleBill(sid,s,g,gid,c){
   /* Kelmagan dars davrni surmaydi: shu dars narxi summadan ayiriladi */
-  const v=version(g,c.start.slice(0,7)),n=s.end?c.n:c.pack,all=[];
+  const v=version(g,c.start.slice(0,7)),n=c.anch||s.end?c.n:c.pack,all=[];
   for(let mm=c.start.slice(0,7);mm<=c.last.slice(0,7);mm=shift(mm,1))
     for(const d of activeDates(g,mm))if(d>=c.start&&d<=c.last&&(!s.end||d<=s.end))all.push(d);
   const miss=((s.absent&&s.absent[gid])||[]).filter(d=>all.includes(d));
   const full=calc(v.price,c.pack,n).total,r=calc(v.price,c.pack,Math.max(0,n-miss.length));
-  return Object.assign(r,{full,absSum:full-r.total,extra:0,n:c.n,price:v.price,pack:c.pack,all,miss,abs:miss.length,k:c.k,cyc:c.start,last:c.last,next:c.next});
+  return Object.assign(r,{full,absSum:full-r.total,anch:!!c.anch,extra:0,n:c.n,price:v.price,pack:c.pack,all,miss,abs:miss.length,k:c.k,cyc:c.start,last:c.last,next:c.next});
 }
 function cyPays(sid,gid,cs,k){
   const key="q"+sid+"|"+gid;
@@ -691,7 +722,7 @@ function paySheet(sid,gid,m,k){
   const s=S.students[sid],g=S.groups[gid],r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&(!k||x.b.k===k));
   if(!r){closeSheet();return}
   const b=r.b,ps=b.k?cyPays(sid,gid,cycles(sid,gid,m),b.k):paysFor(sid,gid,m),paid=r.paid,left=r.left,all=debt(sid,month);
-  const line=b.cyc?`<div><span>${b.pack} dars: ${fmtD(b.cyc)}–${fmtD(b.last)}${s.end&&b.n<b.pack?` (${b.n} dars)`:""}</span><span>${money(b.full)}</span></div>${b.abs?`<div><span>Kelmagan ${b.abs} dars × ${money(b.one)}</span><span>−${money(b.absSum)}</span></div>`:""}${b.next?`<div><span>Keyingi to'lov kuni</span><span>${fmtD(b.next)}</span></div>`:""}`:b.n<b.pack?`<div><span>${b.n} dars × ${money(b.one)}</span><span>${money(b.gross)}</span></div>`:`<div><span>Oylik narx (${b.pack} dars)</span><span>${money(b.price)}</span></div>${b.extra?`<div><span>Qo'shimcha ${b.extra} dars × ${money(b.one)}</span><span>${money(b.gross-b.price)}</span></div>`:""}`+"";
+  const line=b.cyc?`<div><span>${b.anch?b.n:b.pack} dars: ${fmtD(b.cyc)}–${fmtD(b.last)}${s.end&&b.n<b.pack?` (${b.n} dars)`:""}</span><span>${money(b.full)}</span></div>${b.abs?`<div><span>Kelmagan ${b.abs} dars × ${money(b.one)}</span><span>−${money(b.absSum)}</span></div>`:""}${b.next?`<div><span>Keyingi to'lov kuni</span><span>${fmtD(b.next)}</span></div>`:""}`:b.n<b.pack?`<div><span>${b.n} dars × ${money(b.one)}</span><span>${money(b.gross)}</span></div>`:`<div><span>Oylik narx (${b.pack} dars)</span><span>${money(b.price)}</span></div>${b.extra?`<div><span>Qo'shimcha ${b.extra} dars × ${money(b.one)}</span><span>${money(b.gross-b.price)}</span></div>`:""}`+"";
   const dl=b.pct?`<div><span>Chegirma ${b.pct}% (${esc(b.why)})</span><span>−${money(b.disc)}</span></div>`:"";
   const many=all.cur.length>1||all.prevLeft>0?`<button class="sublink" onclick="debtSheet('${sid}')">Barcha kurslar bo'yicha jami qarz: ${money(all.total)} so'm</button>`:"";
   openSheet(`<h2>${esc(s.name)}</h2><p class="note">${esc(g.name)} · ${b.cyc?fmtD(b.cyc)+" dan boshlangan "+b.k+"-davr":mName(m)}</p>${many}
@@ -729,6 +760,12 @@ function upcomingBox(){
   const when=d=>d===t?"Bugun":d===dshift(t,1)?"Ertaga":d<t?"O'tib ketdi":fmtD(d);
   return `<div class="ghead"><h2>To'lov kuni keldi yoki yaqin</h2><span class="lbl">${L.length} ta</span></div><div class="list">${L.map(r=>`<div class="row"><button class="sublink" style="border:0;padding:0;min-height:44px;color:var(--ink)" onclick="paySheet('${r.sid}','${r.gid}','${r.m}',${r.b.k})"><div class="name">${esc(r.s.name)}</div><div class="lbl">${esc(r.g.name)} · ${money(r.left)} so'm · <span class="pill ${r.b.cyc<t?"bad":"warn"}">${when(r.b.cyc)}</span></div></button><button class="btn" onclick="msgSheet('${r.sid}','due','${r.gid}','${r.m}',${r.b.k})">Xabar</button></div>`).join("")}</div>`;
 }
+function phKey(p){return String(p||"").replace(/\D/g,"").slice(-9)}
+/* Bir oila (bir xil telefon yoki bir o'quvchi) bo'yicha shu kunga to'g'ri kelgan to'lovlar */
+function famDue(sid,day){
+  const pk=phKey(S.students[sid].phone);
+  return rows(day.slice(0,7)).filter(r=>r.b.cyc===day&&r.left>0&&(r.sid===sid||pk&&phKey(r.s.phone)===pk));
+}
 function phoneIntl(p){let d=String(p||"").replace(/\D/g,"");if(d.length===9)d="998"+d;return d.length>=11?d:""}
 function fullD(d){return d.slice(8)+"."+d.slice(5,7)+"."+d.slice(0,4)}
 function msgSheet(sid,kind,gid,m,k){
@@ -736,11 +773,13 @@ function msgSheet(sid,kind,gid,m,k){
   const s=S.students[sid];let txt;
   if(kind==="due"){
     const r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&x.b.k===k);if(!r){closeSheet();return}
-    txt=`Assalomu alaykum! ${s.name}ning "${r.g.name}" kursi bo'yicha navbatdagi ${r.b.pack} ta dars ${fullD(r.b.cyc)} kuni boshlanadi (${fullD(r.b.cyc)} – ${fullD(r.b.last)}). To'lov summasi: ${money(r.left)} so'm.`;
+    txt=`Assalomu alaykum! ${s.name}ning "${r.g.name}" kursi bo'yicha navbatdagi ${r.b.anch?r.b.n:r.b.pack} ta dars ${fullD(r.b.cyc)} kuni boshlanadi (${fullD(r.b.cyc)} – ${fullD(r.b.last)}). To'lov summasi: ${money(r.left)} so'm.`;
+    const fam=famDue(sid,r.b.cyc);
+    if(fam.length>1)txt=`Assalomu alaykum! ${fullD(r.b.cyc)} kuni navbatdagi to'lov:\n${fam.map(x=>`${x.s.name}, "${x.g.name}": ${fullD(x.b.cyc)} – ${fullD(x.b.last)}, ${x.b.anch?x.b.n:x.b.pack} dars, ${money(x.left)} so'm`).join("\n")}\nJami: ${money(fam.reduce((a,x)=>a+x.left,0))} so'm.`;
   }else if(kind==="info"){
     const r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&x.b.k===k);if(!r){closeSheet();return}
     const b=r.b,paid=got(r);
-    txt=`Assalomu alaykum! ${s.name}, "${r.g.name}" kursi.\nTo'lov davri: ${fullD(b.cyc)} – ${fullD(b.last)} (${b.pack} ta dars).${b.abs?`\nKelmagan darslar: ${b.abs} ta, summadan ${money(b.absSum)} so'm ayirildi.`:""}\nSumma: ${money(b.total)} so'm${b.pct?` (${b.pct}% chegirma bilan)`:""}.\n${r.left?`To'langan: ${money(paid)} so'm, qoldi: ${money(r.left)} so'm.`:`To'langan: ${money(paid)} so'm. Rahmat!`}${b.next?`\nKeyingi to'lov kuni: ${fullD(b.next)}.`:""}`;
+    txt=`Assalomu alaykum! ${s.name}, "${r.g.name}" kursi.\nTo'lov davri: ${fullD(b.cyc)} – ${fullD(b.last)} (${b.anch?b.n:b.pack} ta dars).${b.abs?`\nKelmagan darslar: ${b.abs} ta, summadan ${money(b.absSum)} so'm ayirildi.`:""}\nSumma: ${money(b.total)} so'm${b.pct?` (${b.pct}% chegirma bilan)`:""}.\n${r.left?`To'langan: ${money(paid)} so'm, qoldi: ${money(r.left)} so'm.`:`To'langan: ${money(paid)} so'm. Rahmat!`}${b.next?`\nKeyingi to'lov kuni: ${fullD(b.next)}.`:""}`;
   }else{
     const d=debt(sid,month);txt=`Assalomu alaykum! ${s.name}ning o'qish to'lovi bo'yicha ${money(d.total)} so'm qarzdorlik bor. Iltimos, to'lovni amalga oshiring.`;
   }
@@ -784,6 +823,16 @@ function saveGrp(id){
   put("groups",id||uid(),{name,teacher:old?old.teacher||"":"",teacherId:old?old.teacherId||"":"",time:document.getElementById("gh").value.trim(),versions,cancelled:old?old.cancelled||[]:[]});
   closeSheet();
 }
+function anchorField(id,s){
+  const pk=phKey(s.phone),opts=[];
+  for(const[sid,x]of Object.entries(S.students)){
+    if(x.end&&x.end<today())continue;
+    if(sid!==id&&!(pk&&phKey(x.phone)===pk))continue;
+    for(const g of Object.keys(stuCourses(x,month)))if(S.groups[g])opts.push([sid+"|"+g,x.name+" — "+S.groups[g].name]);
+  }
+  if(opts.length<2)return"";
+  return `<label class="f">To'lov kuni (oila uchun bitta kun)<select id="sa"><option value="">Har kurs o'z 12 darsi bilan</option>${opts.map(([v,t])=>`<option value="${esc(v)}" ${s.anchor===v?"selected":""}>Shu kursning 12 darsi bilan: ${esc(t)}</option>`).join("")}</select></label>`;
+}
 function togC(el){const s=el.closest(".course").querySelector(".sub");if(s)s.style.display=el.checked?"flex":"none"}
 function stuSheet(id,leadId){
   C={};LEAD=leadId||null;const preg=PREG;PREG=null;
@@ -798,6 +847,7 @@ function stuSheet(id,leadId){
   <label class="f">Telefon<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label>
   <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} ${!own()&&s?"disabled":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">${s?"Kurs va chegirmani rahbar o'zgartiradi.":"Chegirmani rahbar belgilaydi."}</p>`}</div>
   ${s&&!s.end&&billMode()==="cycle"?(()=>{const L=Object.keys(cur).map(g=>[g,payInfo(id,g)]).filter(([,p])=>p);return L.length?`<div class="calc">${L.map(([g,p])=>`<div><span>${esc(S.groups[g].name)}${p.cur?`<br><span class="lbl">Hozirgi 12 dars: ${fmtD(p.cur.start)}–${fmtD(p.cur.last)}</span>`:""}</span><span style="text-align:right">${p.next?`To'lov kuni<br><b>${fullD(p.next)}</b>`:""}</span></div>`).join("")}</div>`:""})():""}
+  ${s&&billMode()==="cycle"?anchorField(id,s):""}
   <div class="two"><label class="f">Boshlagan sana (birinchi darsi)<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
   ${s?`<p class="note">Kurs yoki chegirma o'zgarsa, ${mName(month)} oyidan boshlab qo'llanadi. Oldingi oylar o'zgarmaydi.</p>`:""}
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="ssave" onclick="saveStu(${s?`'${id}'`:""})">Saqlash</button></div>
@@ -831,7 +881,7 @@ function saveStu(id){
   }
   const newSid=id||uid();
   if(LEAD&&S.leads[LEAD]){put("leads",LEAD,Object.assign({},S.leads[LEAD],{status:"done",sid:newSid}));LEAD=null}
-  put("students",newSid,{name,phone:document.getElementById("sp").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
+  put("students",newSid,{name,phone:document.getElementById("sp").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),anchor:document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"",family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
   closeSheet();
 }
 function setSheet(){
