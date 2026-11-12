@@ -178,7 +178,7 @@ let C={};
 let db=null,view="pay",loaded=false;
 const now=new Date();
 let month=now.getFullYear()+"-"+pad(now.getMonth()+1);
-let F={q:"",g:"",st:"all",mode:"stu"};let SV={tab:"list",q:"",g:"",old:false};
+let F={q:"",g:"",st:"all",mode:"tbl"};let SV={tab:"list",q:"",g:"",old:false};
 
 function pad(n){return String(n).padStart(2,"0")}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -494,7 +494,7 @@ function payView(){
   ${own()?`<button class="btn pri wide" onclick="go('rep')">Oylik hisobot: kim qarz, biz kimdan qarz</button>`:""}
   <div class="filters"><input id="q" type="search" placeholder="Ism bo'yicha qidirish" aria-label="Ism bo'yicha qidirish" value="${esc(F.q)}" oninput="F.q=this.value;drawRows()"><select id="fg" aria-label="Guruh" onchange="F.g=this.value;drawRows()"><option value="">Barcha guruhlar</option>${opts}</select></div>
   <div class="seg">${seg}</div>
-  <div class="seg"><button class="${F.mode==="grp"?"on":""}" onclick="F.mode='grp';render()">Guruh bo'yicha</button><button class="${F.mode==="stu"?"on":""}" onclick="F.mode='stu';render()">O'quvchi bo'yicha</button></div>
+  <div class="seg"><button class="${F.mode==="tbl"?"on":""}" onclick="F.mode='tbl';render()">To'lovlar jadvali</button><button class="${F.mode==="grp"?"on":""}" onclick="F.mode='grp';render()">Guruh bo'yicha</button><button class="${F.mode==="stu"?"on":""}" onclick="F.mode='stu';render()">O'quvchi bo'yicha</button></div>
   <div id="rows" style="display:flex;flex-direction:column;gap:8px"></div>
   <button class="btn wide" onclick="copyDebt(this)">Qarzdorlar ro'yxatini nusxalash</button>`;
 }
@@ -507,6 +507,22 @@ function drawRows(){
   if(!Object.keys(S.groups).length){el.innerHTML=`<div class="empty">Avval guruh qo'shing.<br><br><button class="btn pri" onclick="go('grp')">Guruhlarga o'tish</button></div>`;return}
   const R=filtered();
   if(!R.length){el.innerHTML=`<div class="empty">Bu oy uchun mos yozuv topilmadi.</div>`;return}
+  if(F.mode==="tbl"){
+    const q=F.q.trim().toLowerCase(),t=today();
+    const prev=[];for(let m=trackFrom();m<month;m=shift(m,1))rows(m).forEach(r=>{if(r.left>0&&r.due&&(!F.g||r.gid===F.g)&&(!q||r.s.name.toLowerCase().includes(q)))prev.push(r)});
+    const tr=(r)=>{
+      const ps=rowPays(r).slice().sort((a,b)=>a.date<b.date?-1:1),due=r.b.cyc||r.m+"-01",last=ps.length?ps[ps.length-1].date:"";
+      const late=last&&last>due?Math.round((Date.parse(last)-Date.parse(due))/864e5):0;
+      const st=r.left===0?`<span class="pill good">To'langan</span>${late?`<div class="lbl">${late} kun kechikib</div>`:""}`:!r.due?`<span class="pill warn">${due===t?"Bugun":"Kutilmoqda"}</span>`:r.paid+r.credit>0?`<span class="pill warn">Qisman</span><div class="lbl">qoldi ${money(r.left)}</div>`:`<span class="pill bad">Qarz</span><div class="lbl">${Math.round((Date.parse(t)-Date.parse(due))/864e5)} kun o'tdi</div>`;
+      return `<tr onclick="paySheet('${r.sid}','${r.gid}','${r.m}',${r.b.k||0})" style="cursor:pointer"><td><b>${esc(r.s.name)}</b><div class="lbl">${esc(r.g.name)}</div></td><td>${r.b.cyc?fmtD(r.b.cyc)+" – "+fmtD(r.b.last):mName(r.m)}<div class="lbl">${r.b.anch?r.b.n:r.b.pack||r.b.n} dars${r.b.abs?`, ${r.b.abs} kelmagan`:""}</div></td><td><b>${fullD(due)}</b></td><td>${money(r.b.total)}</td><td>${ps.length?ps.map(p=>`${fullD(p.date)}<div class="lbl">${money(p.amount)}</div>`).join(""):r.credit?`<span class="lbl">ortiqchadan ${money(r.credit)}</span>`:"—"}</td><td>${st}</td></tr>`;
+    };
+    const R2=R.slice().sort((a,b)=>(a.b.cyc||a.m)<(b.b.cyc||b.m)?-1:(a.b.cyc||a.m)>(b.b.cyc||b.m)?1:a.s.name.localeCompare(b.s.name));
+    const head=`<thead><tr><th>O'quvchi</th><th>12 talik davr</th><th>To'lash kerak</th><th>Summa</th><th>To'langan sana</th><th>Holat</th></tr></thead>`;
+    el.innerHTML=(prev.length&&F.st!=="paid"?`<div class="ghead"><h2>Oldingi oylardan to'lanmagan</h2><span class="lbl">${prev.length} ta</span></div><div style="overflow-x:auto"><table class="tb">${head}<tbody>${prev.map(tr).join("")}</tbody></table></div>`:"")
+      +`<div class="ghead"><h2>${mName(month)}da to'lash kerak bo'lganlar</h2><span class="lbl">${R2.length} ta</span></div>`
+      +(R2.length?`<div style="overflow-x:auto"><table class="tb">${head}<tbody>${R2.map(tr).join("")}</tbody></table></div><p class="note">Qatorni bossangiz, o'sha 12 talik ochiladi va to'lov yozasiz.</p>`:`<div class="empty">Bu oyda to'lov kuni yo'q.</div>`);
+    return;
+  }
   if(F.mode==="stu"){
     const seen=[...new Set(R.map(r=>r.sid))].sort((a,b)=>S.students[a].name.localeCompare(S.students[b].name));
     el.innerHTML=`<div class="list">`+seen.map(sid=>{
