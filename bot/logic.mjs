@@ -17,7 +17,7 @@ export function loadApp(htmlPath, data) {
   ctx.window = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
   vm.runInContext(code + `
-;globalThis.API={S,rows,debt,famDue,today,dshift,shift,fullD,fmtD,money,center,billMode,phKey,trackFrom,resetC(){C={}}};`, ctx);
+;globalThis.API={S,rows,rowPays,debt,famDue,today,dshift,shift,fullD,fmtD,money,center,billMode,phKey,trackFrom,resetC(){C={}}};`, ctx);
   const A = ctx.API;
   for (const k of Object.keys(A.S)) A.S[k] = data[k] || {};
   A.resetC();
@@ -57,4 +57,21 @@ export function dailyMessages(A) {
   }
   const end = A.center() ? `\n\nHurmat bilan, ${A.center()}` : "";
   return Object.fromEntries(Object.entries(out).map(([c, set]) => [c, `Assalomu alaykum!\n\n${[...set].join("\n\n")}${end}`]));
+}
+
+// To'lov qabul qilingani haqida xabar matni (payment id bo'yicha)
+export function receiptText(A, pid) {
+  const p = A.S.payments[pid]; if (!p) return "";
+  let r = null;
+  for (let m = A.shift(p.month || A.today().slice(0, 7), -1), i = 0; i < 4 && !r; i++, m = A.shift(m, 1))
+    r = A.rows(m).find(x => x.sid === p.sid && x.gid === p.gid && A.rowPays(x).some(q => q.id === pid)) || null;
+  const s = A.S.students[p.sid], g = A.S.groups[p.gid];
+  if (!s || !g) return "";
+  const L = [`Assalomu alaykum! To'lov qabul qilindi ✅`, `${s.name}, "${g.name}" kursi`];
+  if (r && r.b.cyc) L.push(`12 talik davr: ${A.fullD(r.b.cyc)} – ${A.fullD(r.b.last)}`);
+  L.push(`To'landi: ${A.money(p.amount)} so'm (${A.fullD(p.date)}${p.method ? ", " + p.method : ""})`);
+  if (r) L.push(r.left > 0 ? `Shu davr bo'yicha qoldi: ${A.money(r.left)} so'm` : `Shu davr to'liq to'landi.`);
+  if (r && r.b.next) L.push(`Keyingi to'lov kuni: ${A.fullD(r.b.next)}`);
+  if (A.center()) L.push(`\nHurmat bilan, ${A.center()}`);
+  return L.join("\n");
 }

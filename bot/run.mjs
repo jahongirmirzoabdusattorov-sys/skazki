@@ -1,7 +1,7 @@
 // Har soatda GitHub Actions ishga tushiradi:
 // 1) ota-onalarning "Start" bosishini o'quvchiga bog'laydi;
 // 2) Toshkent vaqti bilan 08:00 dan keyin kuniga bir marta to'lov eslatmalarini yuboradi.
-import { loadApp, dailyMessages } from "./logic.mjs";
+import { loadApp, dailyMessages, receiptText } from "./logic.mjs";
 
 const TOKEN = process.env.TELEGRAM_TOKEN, SA = process.env.FIREBASE_SA;
 if (!TOKEN || !SA) { console.log("TELEGRAM_TOKEN yoki FIREBASE_SA sozlanmagan — bot ishlamadi."); process.exit(0); }
@@ -53,8 +53,24 @@ for (const u of up.result || []) {
 if (offset !== (st.offset || 0)) await stRef.set({ offset }, { merge: true });
 if (changed) data = await loadData();
 
-// 2) Kunlik eslatmalar
 const A = loadApp(new URL("../hisob/index.html", import.meta.url).pathname, data);
+
+// 2) To'lov qabul qilinganda ota-onaga xabar (ulanganidan keyingi to'lovlar uchun)
+for (const [pid, p] of Object.entries(data.payments)) {
+  if (p.tgSent || !data.students[p.sid]) continue;
+  const s = data.students[p.sid], pk = A.phKey(s.phone);
+  const chats = {};
+  for (const x of Object.values(data.students)) if (x === s || pk && A.phKey(x.phone) === pk) Object.assign(chats, x.tg || {});
+  const ok = Object.entries(chats).filter(([, v]) => !v.at || (p.date || "") >= v.at);
+  if (!ok.length) continue;
+  const text = receiptText(A, pid);
+  if (!text) continue;
+  for (const [chat] of ok) await api("sendMessage", { chat_id: chat, text });
+  await db.collection("payments").doc(pid).update({ tgSent: true });
+  console.log("To'lov xabari:", s.name, p.amount);
+}
+
+// 3) Kunlik eslatmalar
 const today = A.today(), hour = new Date().getHours();
 const dayRef = db.collection("botstate").doc("daily");
 const day = (await dayRef.get()).data() || {};

@@ -1,7 +1,7 @@
 name: Telegram bot (to'lov eslatmalari)
 on:
   schedule:
-    - cron: "7 * * * *"   # har soatda
+    - cron: "*/15 * * * *"   # har 15 daqiqada
   workflow_dispatch: {}
 concurrency:
   group: telegram-bot
