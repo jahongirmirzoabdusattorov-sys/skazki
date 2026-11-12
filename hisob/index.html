@@ -174,7 +174,7 @@ let C={};
 let db=null,view="pay",loaded=false;
 const now=new Date();
 let month=now.getFullYear()+"-"+pad(now.getMonth()+1);
-let F={q:"",g:"",st:"all",mode:"stu"};
+let F={q:"",g:"",st:"all",mode:"stu"};let SV={tab:"list",q:"",g:"",old:false};
 
 function pad(n){return String(n).padStart(2,"0")}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -453,7 +453,7 @@ function render(){
   if(!loaded)return;
   const a=document.getElementById("app");
   a.innerHTML=(view==="pay"?payView():view==="rep"?repView():view==="led"?leadView():view==="att"?attView():view==="grp"?grpView():view==="tch"?tchView():stuView());
-  if(view==="pay")drawRows();
+  if(view==="pay")drawRows();if(view==="stu"&&SV.tab==="con")drawCon();
 }
 function payView(){
   const R=rows(month),total=R.reduce((a,r)=>a+r.b.total,0),paid=R.reduce((a,r)=>a+got(r),0),left=R.filter(r=>r.due).reduce((a,r)=>a+r.left,0);
@@ -538,13 +538,44 @@ function grpAddSave(gid){
   closeSheet();toast(ids.length+" ta o'quvchi qo'shildi");
 }
 function toggleDay(id,d){if(!own())return;const g=S.groups[id],c=new Set(g.cancelled||[]);c.has(d)?c.delete(d):c.add(d);put("groups",id,Object.assign({},g,{cancelled:[...c]}))}
+function stuTabs(){return `<div class="seg"><button class="${SV.tab==="list"?"on":""}" onclick="SV.tab='list';render()">O'quvchilar</button><button class="${SV.tab==="con"?"on":""}" onclick="SV.tab='con';render()">Telefon daftar</button></div>`}
+function conView(){
+  const opts=Object.entries(S.groups).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,g])=>`<option value="${id}" ${SV.g===id?"selected":""}>${esc(g.name)}</option>`).join("");
+  return stuTabs()+`<div class="filters"><input id="cq" type="search" placeholder="Ism yoki telefon" aria-label="Ism yoki telefon bo'yicha qidirish" value="${esc(SV.q)}" oninput="SV.q=this.value;drawCon()"><select aria-label="Guruh" onchange="SV.g=this.value;drawCon()"><option value="">Barcha guruhlar</option>${opts}</select></div>
+  <label class="check" style="border:0;padding:0"><input type="checkbox" ${SV.old?"checked":""} onchange="SV.old=this.checked;drawCon()">Ketganlarni ham ko'rsatish</label>
+  <div id="con"></div>
+  <div class="acts"><button class="btn" onclick="copyCon()">Ro'yxatni nusxalash</button><button class="btn" onclick="csvCon()">Excel uchun yuklab olish</button></div>`;
+}
+function conList(){
+  const q=SV.q.trim().toLowerCase(),qd=q.replace(/\D/g,"");
+  return Object.entries(S.students).map(([id,s])=>({id,s,gs:Object.keys(stuCourses(s,month)).filter(g=>S.groups[g])}))
+    .filter(x=>(SV.old||!x.s.end||x.s.end>=today())&&(!SV.g||x.gs.includes(SV.g))&&(!q||x.s.name.toLowerCase().includes(q)||(x.s.parent||"").toLowerCase().includes(q)||qd.length>=3&&((x.s.phone||"")+(x.s.phone2||"")).replace(/\D/g,"").includes(qd)))
+    .sort((a,b)=>a.s.name.localeCompare(b.s.name));
+}
+function telA(p){return p?`<a href="tel:+${phoneIntl(p)||p.replace(/\D/g,"")}" style="color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap">${esc(p)}</a>`:""}
+function drawCon(){
+  const el=document.getElementById("con");if(!el)return;
+  const L=conList();
+  el.innerHTML=`<div class="ghead"><h2>${L.length} ta o'quvchi</h2></div>`+(L.length?`<div class="list">${L.map(x=>`<div class="row"><div style="min-width:0"><button class="sublink" style="border:0;padding:0;min-height:0;width:auto" onclick="stuSheet('${x.id}')">${esc(x.s.name)}</button><div class="lbl">${x.s.parent?esc(x.s.parent)+" · ":""}${esc(x.gs.map(g=>S.groups[g].name).join(", ")||"Guruhsiz")}${x.s.end?" · ketgan":""}</div></div><div class="right" style="display:flex;flex-direction:column;gap:4px">${telA(x.s.phone)||`<span class="lbl">telefon yo'q</span>`}${telA(x.s.phone2)}</div></div>`).join("")}</div>`:`<div class="empty">Topilmadi.</div>`);
+}
+async function copyCon(){
+  const t=conList().map(x=>[x.s.name,x.s.parent,x.s.phone,x.s.phone2,x.gs.map(g=>S.groups[g].name).join(", ")].filter(Boolean).join(" | ")).join("\n");
+  try{await navigator.clipboard.writeText(t);toast("Ro'yxat nusxalandi")}catch(e){toast("Nusxalab bo'lmadi")}
+}
+function csvCon(){
+  const q=v=>'"'+String(v||"").replace(/"/g,'""')+'"';
+  const rows=[["Ism familiya","Ota-ona","Telefon","Qo'shimcha telefon","Guruhlar","Boshlagan sana","Ketgan sana"]].concat(conList().map(x=>[x.s.name,x.s.parent,x.s.phone,x.s.phone2,x.gs.map(g=>S.groups[g].name).join(", "),x.s.start,x.s.end]));
+  const blob=new Blob(["\ufeff"+rows.map(r=>r.map(q).join(";")).join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="oquvchilar-telefonlar.csv";document.body.appendChild(a);a.click();a.remove();
+}
 function stuView(){
+  if(SV.tab==="con")return conView();
   const L=Object.entries(S.students).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const list=L.map(([id,s])=>{
     const gn=Object.keys(stuCourses(s,month)).map(g=>S.groups[g]&&S.groups[g].name).filter(Boolean).join(", ");
     const d=debt(id,month),nx=s.end?"":Object.keys(stuCourses(s,month)).map(g=>{const p=payInfo(id,g);return p&&p.next}).filter(Boolean).sort()[0];
     return `<button class="row" onclick="stuSheet('${id}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${esc(gn||"Guruhsiz")}${s.family?" · "+esc(s.family):""}${s.end?" · ketgan":""}${nx?" · to'lov "+fmtD(nx):""}</div></div><div class="right"><div class="val">${money(d.total)}</div><div class="lbl">${d.total?"qarz":"qarzi yo'q"}</div></div></button>`}).join("");
-  return monthBar()+`<button class="btn pri wide" onclick="stuSheet()">O'quvchi qo'shish</button><button class="btn wide" onclick="setSheet()">Sozlamalar va hisob</button>`+(list?`<div class="list">${list}</div>`:`<div class="empty">Hali o'quvchi yo'q.</div>`);
+  return stuTabs()+monthBar()+`<button class="btn pri wide" onclick="stuSheet()">O'quvchi qo'shish</button><button class="btn wide" onclick="setSheet()">Sozlamalar va hisob</button>`+(list?`<div class="list">${list}</div>`:`<div class="empty">Hali o'quvchi yo'q.</div>`);
 }
 
 function tchView(){
@@ -844,7 +875,8 @@ function stuSheet(id,leadId){
   openSheet(`<h2>${s?"O'quvchi":"Yangi o'quvchi"}</h2>
   ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm</button>`:""}
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
-  <label class="f">Telefon<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label>
+  <div class="two"><label class="f">Ota-ona telefoni<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label><label class="f">Qo'shimcha telefon<input id="sp2" inputmode="tel" value="${esc(s?s.phone2||"":"")}"></label></div>
+  <label class="f">Ota-ona ismi<input id="spn" value="${esc(s?s.parent||"":"")}"></label>
   <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} ${!own()&&s?"disabled":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">${s?"Kurs va chegirmani rahbar o'zgartiradi.":"Chegirmani rahbar belgilaydi."}</p>`}</div>
   ${s&&!s.end&&billMode()==="cycle"?(()=>{const L=Object.keys(cur).map(g=>[g,payInfo(id,g)]).filter(([,p])=>p);return L.length?`<div class="calc">${L.map(([g,p])=>`<div><span>${esc(S.groups[g].name)}${p.cur?`<br><span class="lbl">Hozirgi 12 dars: ${fmtD(p.cur.start)}–${fmtD(p.cur.last)}</span>`:""}</span><span style="text-align:right">${p.next?`To'lov kuni<br><b>${fullD(p.next)}</b>`:""}</span></div>`).join("")}</div>`:""})():""}
   ${s&&billMode()==="cycle"?anchorField(id,s):""}
@@ -861,7 +893,7 @@ function saveStu(id){
   const old=id?S.students[id]:null;
   /* Xodim mavjud o'quvchida faqat ism, telefon va sanalarni o'zgartiradi (kurs va chegirma — rahbarniki) */
   if(old&&!own()){
-    put("students",id,Object.assign({},old,{name,phone:document.getElementById("sp").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value}));
+    put("students",id,Object.assign({},old,{name,phone:document.getElementById("sp").value.trim(),phone2:document.getElementById("sp2").value.trim(),parent:document.getElementById("spn").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value}));
     closeSheet();return;
   }
   const groups={},prev=old?stuCourses(old,month):{};
@@ -881,7 +913,7 @@ function saveStu(id){
   }
   const newSid=id||uid();
   if(LEAD&&S.leads[LEAD]){put("leads",LEAD,Object.assign({},S.leads[LEAD],{status:"done",sid:newSid}));LEAD=null}
-  put("students",newSid,{name,phone:document.getElementById("sp").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),anchor:document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"",family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
+  put("students",newSid,{name,phone:document.getElementById("sp").value.trim(),phone2:document.getElementById("sp2").value.trim(),parent:document.getElementById("spn").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),anchor:document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"",family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
   closeSheet();
 }
 function setSheet(){
