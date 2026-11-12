@@ -499,8 +499,8 @@ function stuView(){
   const L=Object.entries(S.students).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const list=L.map(([id,s])=>{
     const gn=Object.keys(stuCourses(s,month)).map(g=>S.groups[g]&&S.groups[g].name).filter(Boolean).join(", ");
-    const d=debt(id,month);
-    return `<button class="row" onclick="stuSheet('${id}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${esc(gn||"Guruhsiz")}${s.family?" · "+esc(s.family):""}${s.end?" · ketgan":""}</div></div><div class="right"><div class="val">${money(d.total)}</div><div class="lbl">${d.total?"qarz":"qarzi yo'q"}</div></div></button>`}).join("");
+    const d=debt(id,month),nx=s.end?"":Object.keys(stuCourses(s,month)).map(g=>{const p=payInfo(id,g);return p&&p.next}).filter(Boolean).sort()[0];
+    return `<button class="row" onclick="stuSheet('${id}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${esc(gn||"Guruhsiz")}${s.family?" · "+esc(s.family):""}${s.end?" · ketgan":""}${nx?" · to'lov "+fmtD(nx):""}</div></div><div class="right"><div class="val">${money(d.total)}</div><div class="lbl">${d.total?"qarz":"qarzi yo'q"}</div></div></button>`}).join("");
   return monthBar()+`<button class="btn pri wide" onclick="stuSheet()">O'quvchi qo'shish</button><button class="btn wide" onclick="setSheet()">Sozlamalar va hisob</button>`+(list?`<div class="list">${list}</div>`:`<div class="empty">Hali o'quvchi yo'q.</div>`);
 }
 
@@ -607,6 +607,18 @@ function groupsOn(d){const m=d.slice(0,7);return Object.entries(S.groups).filter
 function attList(gid,d){const m=d.slice(0,7);return Object.entries(S.students).filter(([,s])=>gid in stuCourses(s,m)&&(!s.start||d>=s.start)&&(!s.end||d<=s.end)).sort((a,b)=>a[1].name.localeCompare(b[1].name))}
 function isAbs(s,gid,d){return((s.absent&&s.absent[gid])||[]).includes(d)}
 function flipAbs(sid,gid,d){const s=S.students[sid],a=Object.assign({},s.absent||{}),c=new Set(a[gid]||[]);c.has(d)?c.delete(d):c.add(d);a[gid]=[...c];put("students",sid,Object.assign({},s,{absent:a}))}
+/* O'quvchining shu kursdagi davrlari: hozirgisi va keyingi to'lov kuni */
+function payInfo(sid,gid){
+  if(billMode()!=="cycle"||!S.groups[gid])return null;
+  const t=today(),cs=cycles(sid,gid,t.slice(0,7));if(!cs.length)return null;
+  const cur=[...cs].reverse().find(c=>c.start<=t)||null,nx=cs.find(c=>c.start>t)||null;
+  return{cur,next:nx?nx.start:""};
+}
+function dueOn(gid,d){
+  const out=[];
+  for(const r of rows(d.slice(0,7)))if(r.gid===gid&&r.b.cyc===d)out.push(r);
+  return out;
+}
 function attView(){
   const G=groupsOn(A.date);
   if(!G.some(([id])=>id===A.g))A.g=G.length?G[0][0]:"";
@@ -617,7 +629,12 @@ function attView(){
   if(!L.length)return bar+chips+`<div class="empty">Bu guruhda o'quvchi yo'q.</div>`;
   return bar+chips+`<p class="note">Hamma kelgan deb turadi. Faqat kelmagan o'quvchini bosing.</p>
   <div class="ghead"><h2>${L.length-no} keldi</h2><span class="lbl">${no} kelmadi</span></div>
-  <div class="list">${L.map(([sid,s])=>{const x=isAbs(s,A.g,A.date);return `<button class="row" aria-pressed="${x}" onclick="flipAbs('${sid}','${A.g}','${A.date}')"><div class="name">${esc(s.name)}</div><span class="pill ${x?"bad":"good"}">${x?"Kelmadi":"Keldi"}</span></button>`}).join("")}</div>`;
+  <div class="list">${L.map(([sid,s])=>{const x=isAbs(s,A.g,A.date);return `<button class="row" aria-pressed="${x}" onclick="flipAbs('${sid}','${A.g}','${A.date}')"><div class="name">${esc(s.name)}</div><span class="pill ${x?"bad":"good"}">${x?"Kelmadi":"Keldi"}</span></button>`}).join("")}</div>${dueBox(A.g,A.date)}`;
+}
+function dueBox(gid,d){
+  if(billMode()!=="cycle")return"";
+  const R=dueOn(gid,d);if(!R.length)return"";
+  return `<div class="ghead"><h2>Shu kuni yangi 12 dars boshlanadi</h2><span class="lbl">to'lov kuni</span></div><div class="list">${R.map(r=>`<button class="row" onclick="paySheet('${r.sid}','${r.gid}','${r.m}',${r.b.k})"><div><div class="name">${esc(r.s.name)}</div><div class="lbl">${fmtD(r.b.cyc)}–${fmtD(r.b.last)} · ${r.b.k}-davr</div></div><div class="right"><div class="val">${money(r.left)}</div>${r.left?`<span class="pill bad">To'lov yozish</span>`:`<span class="pill good">To'langan</span>`}</div></button>`).join("")}</div>`;
 }
 
 /* ---- Oynalar ---- */
@@ -768,7 +785,8 @@ function stuSheet(id,leadId){
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
   <label class="f">Telefon<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label>
   <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} ${!own()&&s?"disabled":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">${s?"Kurs va chegirmani rahbar o'zgartiradi.":"Chegirmani rahbar belgilaydi."}</p>`}</div>
-  <div class="two"><label class="f">Boshlagan sana<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
+  ${s&&!s.end&&billMode()==="cycle"?(()=>{const L=Object.keys(cur).map(g=>[g,payInfo(id,g)]).filter(([,p])=>p);return L.length?`<div class="calc">${L.map(([g,p])=>`<div><span>${esc(S.groups[g].name)}${p.cur?`<br><span class="lbl">Hozirgi 12 dars: ${fmtD(p.cur.start)}–${fmtD(p.cur.last)}</span>`:""}</span><span style="text-align:right">${p.next?`To'lov kuni<br><b>${fullD(p.next)}</b>`:""}</span></div>`).join("")}</div>`:""})():""}
+  <div class="two"><label class="f">Boshlagan sana (birinchi darsi)<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
   ${s?`<p class="note">Kurs yoki chegirma o'zgarsa, ${mName(month)} oyidan boshlab qo'llanadi. Oldingi oylar o'zgarmaydi.</p>`:""}
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="ssave" onclick="saveStu(${s?`'${id}'`:""})">Saqlash</button></div>
   ${s&&own()?`<button class="btn del wide" onclick="armDelete(this,()=>{closeSheet();del('students','${id}')})">O'quvchini o'chirish</button>`:""}`);
