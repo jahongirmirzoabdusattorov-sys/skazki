@@ -1011,6 +1011,24 @@ async function importPick(inp){
   for(const col of Object.keys(S))if(d&&d[col]&&typeof d[col]==="object")
     for(const[id,v]of Object.entries(d[col]))if(v&&typeof v==="object"&&!Array.isArray(v)&&id&&!id.includes("/"))items.push([col,id,v]);
   if(!items.length){toast("Faylda ma'lumot topilmadi");return}
+  /* Saytda shu nomli guruh yoki ustoz bo'lsa, fayldagi o'quvchi va to'lovlar o'shanga ulanadi */
+  const map={};
+  for(const[c,id,v]of items)if((c==="groups"||c==="teachers")&&!(id in S[c])){
+    const hit=Object.entries(S[c]).find(([,x])=>natKey(c,x)===natKey(c,v));if(hit)map[id]=hit[0];
+  }
+  const re=x=>map[x]||x,reKeys=o=>{if(!o||typeof o!=="object")return o;const r={};for(const k of Object.keys(o))r[re(k)]=o[k];return r};
+  if(Object.keys(map).length)for(const it of items){
+    const v=it[2]=JSON.parse(JSON.stringify(it[2]));
+    if(it[0]==="students"){
+      if(Array.isArray(v.groupIds))v.groupIds=v.groupIds.map(re);
+      if(Array.isArray(v.versions))v.versions.forEach(x=>x.groups=reKeys(x.groups));
+      if(v.absent)v.absent=reKeys(v.absent);
+      if(v.anchor){const[a,b]=v.anchor.split("|");v.anchor=a+"|"+re(b)}
+    }
+    if(it[0]==="payments"||it[0]==="leads")v.gid=re(v.gid);
+    if(it[0]==="salaries")v.tid=re(v.tid);
+    if(it[0]==="teachers"&&Array.isArray(v.versions))v.versions.forEach(x=>x.courses=reKeys(x.courses));
+  }
   const P=importPlan(items);IMP=P.add;
   const by=L=>Object.keys(S).map(c=>[c,L.filter(x=>x[0]===c).length]).filter(x=>x[1]).map(([c,n])=>`<div><span>${esc(c)}</span><span>${n} ta</span></div>`).join("");
   const nm=([c,id,v])=>esc(v.name||[v.date,v.amount&&money(v.amount)].filter(Boolean).join(" · ")||id);
