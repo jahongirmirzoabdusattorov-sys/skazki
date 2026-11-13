@@ -17,7 +17,7 @@ export function loadApp(htmlPath, data) {
   ctx.window = ctx; ctx.globalThis = ctx;
   vm.createContext(ctx);
   vm.runInContext(code + `
-;globalThis.API={S,rows,rowPays,courseHist,stuCourses,debt,famDue,today,dshift,shift,fullD,fmtD,money,center,billMode,phKey,trackFrom,resetC(){C={}}};`, ctx);
+;globalThis.API={S,rows,rowPays,courseHist,stuCourses,itemsOf,itemLeft,debt,famDue,today,dshift,shift,fullD,fmtD,money,center,billMode,phKey,trackFrom,resetC(){C={}}};`, ctx);
   const A = ctx.API;
   for (const k of Object.keys(A.S)) A.S[k] = data[k] || {};
   A.resetC();
@@ -95,6 +95,10 @@ export function statusText(A, chat) {
       if (next && next.b.cyc) line += `\n  Keyingi to'lov kuni: ${A.fullD(next.b.cyc)}, ${A.money(next.left)} so'm`;
       out.push(line);
     }
+  }
+  for (const [, s] of fam) for (const it of A.itemsOf(s)) {
+    const l = A.itemLeft(it); if (!l) continue; total += l;
+    out.push(`• ${s.name}: ${it.title} (${A.fullD(it.date)}) — qarz ${A.money(l)} so'm`);
   }
   if (!out.length) return "";
   return `Hozirgi holat (${A.fullD(t)}):\n\n${out.join("\n\n")}${total ? `\n\nJami qarz: ${A.money(total)} so'm` : ""}${A.center() ? `\n\nHurmat bilan, ${A.center()}` : ""}`;

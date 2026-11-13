@@ -381,13 +381,70 @@ function byStu(m){
   return C["b"+m]=o;
 }
 /* O'quvchining shu oydagi va oldingi oylardagi qarzi */
+/* ---- Kitob va boshqa qarzlar (o'quvchi kartasida saqlanadi) ---- */
+function itemsOf(s){return s&&Array.isArray(s.items)?s.items:[]}
+function itemPaid(it){return(it.paid||[]).reduce((a,p)=>a+(+p.amount||0),0)}
+function itemLeft(it){return Math.max(0,(+it.amount||0)-itemPaid(it))}
+function itemsDebt(s){return itemsOf(s).reduce((a,it)=>a+itemLeft(it),0)}
+let IF={q:"",st:"debt"};
+function itemsView(el){
+  const q=IF.q.trim().toLowerCase(),L=[];
+  for(const[sid,s]of Object.entries(S.students))for(const it of itemsOf(s))L.push({sid,s,it,left:itemLeft(it)});
+  const R=L.filter(x=>(IF.st==="all"||(IF.st==="debt"?x.left>0:x.left===0))&&(!q||x.s.name.toLowerCase().includes(q)||(x.it.title||"").toLowerCase().includes(q))).sort((a,b)=>(b.left>0)-(a.left>0)||(a.it.date<b.it.date?1:-1));
+  const tot=L.reduce((a,x)=>a+x.left,0);
+  el.innerHTML=`<section class="sum"><div class="two"><div><div class="lbl">Kitob va boshqa qarzlar</div><div class="big ${tot?"":"ok"}">${money(tot)} so'm</div></div><div><div class="lbl">Qarzdorlar</div><div class="val">${new Set(L.filter(x=>x.left).map(x=>x.sid)).size} nafar</div></div></div></section>
+  <button class="btn pri wide" onclick="itemSheet()">Kitob / boshqa narsa berish</button>
+  <div class="filters"><input type="search" placeholder="Ism yoki kitob nomi" aria-label="Ism yoki kitob nomi" value="${esc(IF.q)}" oninput="IF.q=this.value;itemsView(document.getElementById('rows'))"></div>
+  <div class="seg">${[["debt","Qarz"],["paid","To'langan"],["all","Hammasi"]].map(([k,t])=>`<button class="${IF.st===k?"on":""}" onclick="IF.st='${k}';drawRows()">${t}</button>`).join("")}</div>
+  ${R.length?`<div class="list">${R.map(x=>`<button class="row" onclick="itemSheet('${x.sid}','${x.it.id}')"><div><div class="name">${esc(x.s.name)}</div><div class="lbl">${esc(x.it.title)} · ${fullD(x.it.date)}</div></div><div class="right"><div class="val">${money(x.left||x.it.amount)}</div>${x.left?`<span class="pill bad">${itemPaid(x.it)?"Qisman":"Qarz"}</span>`:`<span class="pill good">To'langan</span>`}</div></button>`).join("")}</div>`:`<div class="empty">Yozuv yo'q.</div>`}`;
+}
+function itemSheet(sid,iid){
+  const s=sid?S.students[sid]:null,it=s&&iid?itemsOf(s).find(x=>x.id===iid):null;
+  if(it){
+    const left=itemLeft(it);
+    openSheet(`<h2>${esc(s.name)}</h2><p class="note">${esc(it.title)} · berilgan ${fullD(it.date)}</p>
+    <div class="calc"><div><span>Narxi</span><span>${money(it.amount)}</span></div><div><span>To'langan</span><span>${money(itemPaid(it))}</span></div><div class="t"><span>Qoldi</span><span>${money(left)} so'm</span></div></div>
+    ${(it.paid||[]).length?`<div class="list">${it.paid.map((p,i)=>`<div class="row"><div><div class="val">${money(p.amount)} so'm</div><div class="lbl">${fullD(p.date)} · ${esc(p.method||"")}</div></div>${own()?`<button class="btn del" onclick="armDelete(this,()=>itemPayDel('${sid}','${iid}',${i}))">O'chirish</button>`:""}</div>`).join("")}</div>`:""}
+    ${left?`<label class="f">Bergan puli<input id="ia" inputmode="numeric" value="${money(left)}" oninput="fmtMoney(this)"></label>
+    <div class="two"><label class="f">Sana<input id="id" type="date" value="${today()}"></label><label class="f">Usul<select id="im"><option>Naqd</option><option>Karta</option><option>O'tkazma</option></select></label></div>
+    <button class="btn pri wide" onclick="itemPay('${sid}','${iid}')">To'lovni yozish</button>`:""}
+    <div class="acts"><button class="btn" onclick="closeSheet()">Yopish</button>${own()?`<button class="btn del" onclick="armDelete(this,()=>itemDel('${sid}','${iid}'))">Yozuvni o'chirish</button>`:""}</div>`);
+    return;
+  }
+  const L=Object.entries(S.students).filter(([,x])=>!x.end||x.end>=today()).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  const titles=[...new Set(Object.values(S.students).flatMap(x=>itemsOf(x).map(i=>i.title)).filter(Boolean))];
+  openSheet(`<h2>Kitob / boshqa narsa berish</h2>
+  <label class="f">O'quvchi<select id="is">${sid?"":`<option value="">Tanlang</option>`}${L.map(([id,x])=>`<option value="${id}" ${id===sid?"selected":""}>${esc(x.name)}</option>`).join("")}</select></label>
+  <label class="f">Nima berildi<input id="it" list="itl" placeholder="Masalan: Mishutka kitobi"><datalist id="itl">${titles.map(t=>`<option value="${esc(t)}">`).join("")}</datalist></label>
+  <div class="two"><label class="f">Narxi (so'm)<input id="ip" inputmode="numeric" oninput="fmtMoney(this)"></label><label class="f">Berilgan sana<input id="idt" type="date" value="${today()}"></label></div>
+  <label class="f">Darhol to'lagani (bo'lmasa 0)<input id="i0" inputmode="numeric" value="0" oninput="fmtMoney(this)"></label>
+  <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" onclick="itemSave()">Saqlash</button></div>`);
+}
+function itemSave(){
+  const sid=document.getElementById("is").value,title=document.getElementById("it").value.trim(),amount=num(document.getElementById("ip").value),date=document.getElementById("idt").value||today(),p0=num(document.getElementById("i0").value);
+  if(!sid){toast("O'quvchini tanlang");return}
+  if(!title){toast("Nima berilganini yozing");return}
+  if(!amount){toast("Narxini kiriting");return}
+  const s=S.students[sid],it={id:uid(),title,amount,date,paid:p0?[{amount:Math.min(p0,amount),date,method:"Naqd",by:AUTH.uid||""}]:[]};
+  put("students",sid,Object.assign({},s,{items:[...itemsOf(s),it]}));
+  closeSheet();toast("Yozildi");
+}
+function itemUpd(sid,iid,fn){const s=S.students[sid];put("students",sid,Object.assign({},s,{items:itemsOf(s).map(x=>x.id===iid?fn(Object.assign({},x)):x)}))}
+function itemPay(sid,iid){
+  const a=num(document.getElementById("ia").value);if(!a){toast("Summani kiriting");return}
+  itemUpd(sid,iid,x=>(x.paid=[...(x.paid||[]),{amount:a,date:document.getElementById("id").value||today(),method:document.getElementById("im").value,by:AUTH.uid||""}],x));
+  closeSheet();toast("To'lov yozildi");
+}
+function itemPayDel(sid,iid,i){itemUpd(sid,iid,x=>(x.paid=(x.paid||[]).filter((_,k)=>k!==i),x));itemSheet(sid,iid)}
+function itemDel(sid,iid){const s=S.students[sid];put("students",sid,Object.assign({},s,{items:itemsOf(s).filter(x=>x.id!==iid)}));closeSheet()}
 function debt(sid,upto){
   const s=S.students[sid],cur=(byStu(upto)[sid]||[]).filter(r=>r.due),prev=[];
   let m=trackFrom();
   if(s.start&&s.start.slice(0,7)>m)m=s.start.slice(0,7);
   for(;m<upto;m=shift(m,1))(byStu(m)[sid]||[]).forEach(r=>{if(r.left>0&&r.due)prev.push(r)});
   const sum=L=>L.reduce((a,r)=>a+r.left,0);
-  return{cur,prev,curLeft:sum(cur),prevLeft:sum(prev),total:sum(cur)+sum(prev)};
+  const it=itemsDebt(s);
+  return{cur,prev,curLeft:sum(cur),prevLeft:sum(prev),items:it,total:sum(cur)+sum(prev)+it};
 }
 /* O'qituvchi oyligi */
 function tTerms(t,m){
@@ -511,7 +568,7 @@ function payView(){
   ${own()?`<button class="btn pri wide" onclick="go('rep')">Oylik hisobot: kim qarz, biz kimdan qarz</button>`:""}
   <div class="filters"><input id="q" type="search" placeholder="Ism bo'yicha qidirish" aria-label="Ism bo'yicha qidirish" value="${esc(F.q)}" oninput="F.q=this.value;drawRows()"><select id="fg" aria-label="Guruh" onchange="F.g=this.value;drawRows()"><option value="">Barcha guruhlar</option>${opts}</select></div>
   <div class="seg">${seg}</div>
-  <div class="seg"><button class="${F.mode==="tbl"?"on":""}" onclick="F.mode='tbl';render()">To'lovlar jadvali</button><button class="${F.mode==="grp"?"on":""}" onclick="F.mode='grp';render()">Guruh bo'yicha</button><button class="${F.mode==="stu"?"on":""}" onclick="F.mode='stu';render()">O'quvchi bo'yicha</button></div>
+  <div class="seg"><button class="${F.mode==="tbl"?"on":""}" onclick="F.mode='tbl';render()">To'lovlar jadvali</button><button class="${F.mode==="itm"?"on":""}" onclick="F.mode='itm';render()">Kitob va boshqa</button><button class="${F.mode==="grp"?"on":""}" onclick="F.mode='grp';render()">Guruh bo'yicha</button><button class="${F.mode==="stu"?"on":""}" onclick="F.mode='stu';render()">O'quvchi bo'yicha</button></div>
   <div id="rows" style="display:flex;flex-direction:column;gap:8px"></div>
   <button class="btn wide" onclick="copyDebt(this)">Qarzdorlar ro'yxatini nusxalash</button>`;
 }
@@ -524,6 +581,7 @@ function drawRows(){
   if(!Object.keys(S.groups).length){el.innerHTML=`<div class="empty">Avval guruh qo'shing.<br><br><button class="btn pri" onclick="go('grp')">Guruhlarga o'tish</button></div>`;return}
   const R=filtered();
   if(!R.length){el.innerHTML=`<div class="empty">Bu oy uchun mos yozuv topilmadi.</div>`;return}
+  if(F.mode==="itm"){itemsView(el);return}
   if(F.mode==="tbl"){
     const q=F.q.trim().toLowerCase(),t=today();
     const prev=[];for(let m=trackFrom();m<month;m=shift(m,1))rows(m).forEach(r=>{if(r.left>0&&r.due&&(!F.g||r.gid===F.g)&&(!q||r.s.name.toLowerCase().includes(q)))prev.push(r)});
@@ -841,7 +899,7 @@ function debtSheet(sid){
   const s=S.students[sid],d=debt(sid,month);
   const item=r=>`<button class="row" onclick="paySheet('${sid}','${r.gid}','${r.m}',${r.b.k||0})"><div><div class="name">${esc(r.g.name)}</div><div class="lbl">${r.b.cyc?fmtD(r.b.cyc)+"–"+fmtD(r.b.last):mName(r.m)} · ${money(r.b.total)} so'm${r.b.pct?` (−${r.b.pct}%)`:""}</div></div><div class="right"><div class="val">${money(r.left)}</div>${r.left?`<span class="pill bad">Qarz</span>`:`<span class="pill good">To'langan</span>`}</div></button>`;
   openSheet(`<h2>${esc(s.name)}</h2><p class="note">${s.phone?esc(s.phone)+" · ":""}${mName(month)} holatiga · ${lastTxt(sid)}</p>
-  <div class="calc"><div><span>Shu oy, barcha kurslar</span><span>${money(d.curLeft)}</span></div><div><span>Oldingi oylardan</span><span>${money(d.prevLeft)}</span></div><div class="t"><span>Jami qarz</span><span>${money(d.total)} so'm</span></div>${creditOut(sid,month)?`<div><span>Keyingi oyga o'tadi</span><span>${money(creditOut(sid,month))}</span></div>`:""}</div>
+  <div class="calc"><div><span>Shu oy, barcha kurslar</span><span>${money(d.curLeft)}</span></div><div><span>Oldingi oylardan</span><span>${money(d.prevLeft)}</span></div>${d.items?`<div><span>Kitob va boshqa</span><span>${money(d.items)}</span></div>`:""}<div class="t"><span>Jami qarz</span><span>${money(d.total)} so'm</span></div>${creditOut(sid,month)?`<div><span>Keyingi oyga o'tadi</span><span>${money(creditOut(sid,month))}</span></div>`:""}</div>
   ${Object.keys(stuCourses(s,month)).filter(g=>S.groups[g]).length?`<div class="lbl">12 taliklar jadvali (qaysi davr uchun va qachon to'langan):</div><div class="seg">${Object.keys(stuCourses(s,month)).filter(g=>S.groups[g]).map(g=>`<button onclick="courseSheet('${sid}','${g}')">${esc(S.groups[g].name)}</button>`).join("")}</div>`:""}
   ${d.cur.length?`<div class="list">${d.cur.map(item).join("")}</div>`:""}
   ${d.prev.length?`<div class="lbl">Oldingi oylar</div><div class="list">${d.prev.map(item).join("")}</div>`:""}
@@ -852,11 +910,12 @@ function payAll(sid){
   let a=num(document.getElementById("aa").value);
   if(!a){toast("Summani kiriting");return}
   const d=debt(sid,month),date=document.getElementById("ad").value||today(),method=document.getElementById("am").value;
-  const L=d.prev.concat(d.cur).filter(r=>r.left>0);
-  L.forEach((r,i)=>{
-    const x=i===L.length-1?a:Math.min(a,r.left);a-=x;
-    if(x>0)put("payments",uid(),Object.assign({month:r.m,sid,gid:r.gid,amount:x,date,method,by:AUTH.uid},r.b.k?{cyc:r.b.k}:{}));
-  });
+  const L=d.prev.concat(d.cur).filter(r=>r.left>0),IT=itemsOf(S.students[sid]).filter(it=>itemLeft(it)>0);
+  const part=L.map(r=>[r,Math.min(a,r.left)]);let rest=a-part.reduce((s,x)=>s+x[1],0);
+  const ip=IT.map(it=>{const x=Math.min(rest,itemLeft(it));rest-=x;return[it,x]});
+  if(rest>0){if(part.length)part[part.length-1][1]+=rest;else if(ip.length)ip[ip.length-1][1]+=rest}
+  part.forEach(([r,x])=>{if(x>0)put("payments",uid(),Object.assign({month:r.m,sid,gid:r.gid,amount:x,date,method,by:AUTH.uid},r.b.k?{cyc:r.b.k}:{}))});
+  if(ip.some(([,x])=>x>0)){const s=S.students[sid];put("students",sid,Object.assign({},s,{items:itemsOf(s).map(it=>{const f=ip.find(([y])=>y.id===it.id);return f&&f[1]>0?Object.assign({},it,{paid:[...(it.paid||[]),{amount:f[1],date,method,by:AUTH.uid||""}]}):it})}))}
   closeSheet();toast("To'lov yozildi");
 }
 function paySheet(sid,gid,m,k){
@@ -986,6 +1045,7 @@ function stuSheet(id,leadId){
   openSheet(`<h2>${s?"O'quvchi":"Yangi o'quvchi"}</h2>
   ${s?`<button class="sublink" onclick="tgSheet('${id}')">${tgCount(s)?`Telegram bot: ota-ona ulangan (${tgCount(s)}) ✓`:"Telegram bot: ota-onaga ulanish havolasini yuborish"}</button>`:""}
   ${s&&Object.keys(cur).filter(g=>S.groups[g]).length?`<div class="seg">${Object.keys(cur).filter(g=>S.groups[g]).map(g=>`<button onclick="courseSheet('${id}','${g}')">${esc(S.groups[g].name)}: to'lovlar jadvali</button>`).join("")}</div>`:""}
+  ${s?`<div class="seg"><button onclick="itemSheet('${id}')">+ Kitob / boshqa narsa berish</button>${itemsOf(s).map(it=>`<button onclick="itemSheet('${id}','${it.id}')">${esc(it.title)}: ${itemLeft(it)?"qarz "+money(itemLeft(it)):"to'langan"}</button>`).join("")}</div>`:""}
   ${d?`<button class="sublink" onclick="debtSheet('${id}')">Jami qarz: ${money(d.total)} so'm${(p=>p?` · oxirgi to'lov ${fullD(p.date)}, ${money(p.amount)} so'm`:" · hali to'lov yo'q")(lastPay(id))}</button>`:""}
   <label class="f">Ism va familiya<input id="sn" value="${esc(s?s.name:pre?pre.name:"")}"></label>
   <div class="two"><label class="f">Ota-ona telefoni<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label><label class="f">Qo'shimcha telefon<input id="sp2" inputmode="tel" value="${esc(s?s.phone2||"":"")}"></label></div>
