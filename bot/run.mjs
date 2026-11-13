@@ -39,8 +39,9 @@ const center = () => (data.settings.main && data.settings.main.center) || "o'quv
 const app = () => loadApp(new URL("../hisob/index.html", import.meta.url).pathname, data);
 
 // Bot nomini saytdagi sozlamaga o'zi yozadi
-const me = await api("getMe");
-if (!me.ok) { console.log("Telegram token ishlamadi — GitHub'dagi TELEGRAM_TOKEN ni tekshiring."); process.exit(1); }
+let me = { ok: false };
+for (let i = 0; i < 10 && !me.ok; i++) { me = await api("getMe"); if (!me.ok && me.error_code !== 401) await new Promise(r => setTimeout(r, 15000)); else if (me.error_code === 401) break; }
+if (!me.ok) { console.log(me.error_code === 401 ? "Telegram token ishlamadi — GitHub'dagi TELEGRAM_TOKEN ni tekshiring." : "Telegram bilan aloqa yo'q (tarmoq)."); process.exit(1); }
 const botUser = me.result.username;
 console.log("Bot:", "@" + botUser);
 if (!data.settings.main || data.settings.main.bot !== botUser) {
