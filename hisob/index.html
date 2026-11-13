@@ -308,8 +308,13 @@ function cycleBill(sid,s,g,gid,c){
   for(let mm=c.start.slice(0,7);mm<=c.last.slice(0,7);mm=shift(mm,1))
     for(const d of activeDates(g,mm))if(d>=c.start&&d<=c.last&&(!s.end||d<=s.end))all.push(d);
   const miss=((s.absent&&s.absent[gid])||[]).filter(d=>all.includes(d));
-  const full=calc(v.price,c.pack,n).total,r=calc(v.price,c.pack,Math.max(0,n-miss.length));
-  return Object.assign(r,{full,absSum:full-r.total,anch:!!c.anch,extra:0,n:c.n,price:v.price,pack:c.pack,all,miss,abs:miss.length,k:c.k,cyc:c.start,last:c.last,next:c.next});
+  /* Har bir dars o'z oyining narxida: oktabrdagi darslar oktabr narxida, noyabrdagilari noyabr narxida */
+  const one=d=>{const x=version(g,d.slice(0,7));return x.price/x.pack};
+  const L=all.slice(0,n);while(L.length<n)L.push(L.length?L[L.length-1]:c.start);
+  const split={};for(const d of L){const mm=d.slice(0,7);split[mm]=split[mm]||{m:mm,n:0,one:one(d)};split[mm].n++}
+  const fullX=L.reduce((a,d)=>a+one(d),0),absX=miss.reduce((a,d)=>a+one(d),0);
+  const full=roundSum(fullX),r={total:roundSum(Math.max(0,fullX-absX)),one:roundSum(v.price/c.pack)};
+  return Object.assign(r,{full,absSum:full-r.total,split:Object.values(split),anch:!!c.anch,extra:0,n:c.n,price:v.price,pack:c.pack,all,miss,abs:miss.length,k:c.k,cyc:c.start,last:c.last,next:c.next});
 }
 function cyPays(sid,gid,cs,k){
   const key="q"+sid+"|"+gid;
@@ -837,7 +842,7 @@ function paySheet(sid,gid,m,k){
   const s=S.students[sid],g=S.groups[gid],r=rows(m).find(x=>x.sid===sid&&x.gid===gid&&(!k||x.b.k===k));
   if(!r){closeSheet();return}
   const b=r.b,ps=b.k?cyPays(sid,gid,cycles(sid,gid,m),b.k):paysFor(sid,gid,m),paid=r.paid,left=r.left,all=debt(sid,month);
-  const line=b.cyc?`<div><span>${b.anch?b.n:b.pack} dars: ${fmtD(b.cyc)}–${fmtD(b.last)}${s.end&&b.n<b.pack?` (${b.n} dars)`:""}</span><span>${money(b.full)}</span></div>${b.abs?`<div><span>Kelmagan ${b.abs} dars × ${money(b.one)}</span><span>−${money(b.absSum)}</span></div>`:""}${b.next?`<div><span>Keyingi to'lov kuni</span><span>${fmtD(b.next)}</span></div>`:""}`:b.n<b.pack?`<div><span>${b.n} dars × ${money(b.one)}</span><span>${money(b.gross)}</span></div>`:`<div><span>Oylik narx (${b.pack} dars)</span><span>${money(b.price)}</span></div>${b.extra?`<div><span>Qo'shimcha ${b.extra} dars × ${money(b.one)}</span><span>${money(b.gross-b.price)}</span></div>`:""}`+"";
+  const line=b.cyc?`<div><span>${b.anch?b.n:b.pack} dars: ${fmtD(b.cyc)}–${fmtD(b.last)}${s.end&&b.n<b.pack?` (${b.n} dars)`:""}</span><span>${money(b.full)}</span></div>${b.split&&b.split.length>1?b.split.map(x=>`<div class="lbl" style="display:flex;justify-content:space-between"><span>${mName(x.m)}: ${x.n} dars × ${money(roundSum(x.one))}</span><span>${money(roundSum(x.n*x.one))}</span></div>`).join(""):""}${b.abs?`<div><span>Kelmagan ${b.abs} dars × ${money(b.one)}</span><span>−${money(b.absSum)}</span></div>`:""}${b.next?`<div><span>Keyingi to'lov kuni</span><span>${fmtD(b.next)}</span></div>`:""}`:b.n<b.pack?`<div><span>${b.n} dars × ${money(b.one)}</span><span>${money(b.gross)}</span></div>`:`<div><span>Oylik narx (${b.pack} dars)</span><span>${money(b.price)}</span></div>${b.extra?`<div><span>Qo'shimcha ${b.extra} dars × ${money(b.one)}</span><span>${money(b.gross-b.price)}</span></div>`:""}`+"";
   const dl=b.pct?`<div><span>Chegirma ${b.pct}% (${esc(b.why)})</span><span>−${money(b.disc)}</span></div>`:"";
   const many=all.cur.length>1||all.prevLeft>0?`<button class="sublink" onclick="debtSheet('${sid}')">Barcha kurslar bo'yicha jami qarz: ${money(all.total)} so'm</button>`:"";
   openSheet(`<h2>${esc(s.name)}</h2><p class="note">${esc(g.name)} · ${b.cyc?fmtD(b.cyc)+" dan boshlangan "+b.k+"-davr":mName(m)}</p>${many}${(()=>{const E=courseHist(sid,gid).filter(x=>x.left>0&&x.due&&x.m>=trackFrom()&&(x.b.cyc||x.m)<(b.cyc||m));C={};return E.length?`<button class="sublink" style="color:var(--bad)" onclick="courseSheet('${sid}','${gid}')">Diqqat: oldingi 12 talik (${E.map(x=>fmtD(x.b.cyc||x.m+"-01")).join(", ")}) to'lanmagan. Pul avval o'shanga yozilishi uchun jadvaldan yozing →</button>`:""})()}<button class="sublink" onclick="courseSheet('${sid}','${gid}')">Shu kursning 12 taliklar jadvali</button>
