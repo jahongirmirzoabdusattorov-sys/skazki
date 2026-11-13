@@ -1069,6 +1069,35 @@ function openGate(mi){go();if(mi!=null){const b=S.tests[mi-1]||0;
 if(SITE){try{const P=new URLSearchParams(location.search),k=P.get('kod');if(k!==null){P.delete('kod');const qs=P.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:'')+location.hash);if(!full)tryCode(k).catch(()=>{})}}catch(e){}}
 openHome();
 </script>
-<script>try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){})}catch(e){}</script>
+<style>
+#instBtn{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:9999;display:none;align-items:center;gap:8px;border:0;border-radius:999px;padding:12px 18px 12px 12px;background:#F5B700;color:#3D2B00;font:700 16px/1 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 8px 20px -8px rgba(0,0,0,.5);cursor:pointer}
+#instBtn img{width:30px;height:30px;border-radius:8px}
+#instX{position:fixed;right:6px;bottom:calc(52px + env(safe-area-inset-bottom));z-index:10000;display:none;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font:700 14px/26px system-ui;cursor:pointer}
+#instTip{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9999;display:none;max-width:420px;margin:auto;background:#fff;color:#12303A;border-radius:16px;padding:14px 16px;font:15px/1.45 system-ui,-apple-system,sans-serif;box-shadow:0 12px 30px -10px rgba(0,0,0,.45)}
+</style>
+<button id="instBtn" type="button"><img src="icons/icon-192.png" alt="">Установить игру</button>
+<button id="instX" type="button" aria-label="Скрыть">✕</button>
+<div id="instTip" role="dialog"></div>
+<script>
+(function(){
+  try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){})}catch(e){}
+  var app=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+  var hidden=false;try{hidden=!!localStorage.getItem("mishInstHide")}catch(e){}
+  if(app||hidden)return;
+  var b=document.getElementById("instBtn"),x=document.getElementById("instX"),tip=document.getElementById("instTip"),ev=null;
+  var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  function show(){b.style.display="flex";x.style.display="block"}
+  window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();ev=e;show()});
+  window.addEventListener("appinstalled",function(){b.style.display=x.style.display=tip.style.display="none"});
+  if(ios)show();
+  setTimeout(function(){if(!ev&&!ios)show()},3000);
+  b.onclick=function(){
+    if(ev){ev.prompt();ev=null;b.style.display=x.style.display="none";return}
+    tip.innerHTML=ios?"Нажмите <b>«Поделиться»</b> (квадрат со стрелкой вверх) → <b>«На экран «Домой»»</b> → <b>«Добавить»</b>.":"Нажмите <b>⋮</b> в правом верхнем углу браузера → <b>«Установить приложение»</b> или <b>«Добавить на главный экран»</b>.";
+    tip.style.display=tip.style.display==="block"?"none":"block";
+  };
+  x.onclick=function(){b.style.display=x.style.display=tip.style.display="none";try{localStorage.setItem("mishInstHide","1")}catch(e){}};
+})();
+</script>
 </body>
 </html>
