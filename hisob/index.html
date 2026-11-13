@@ -208,7 +208,7 @@ function calc(price,pack,n){
   return{total:roundSum(price/pack*n),extra:0,one:roundSum(price/pack)};
 }
 function bill(s,g,m,gid){
-  const v=version(g,m),all=activeDates(g,m).filter(x=>(!s.start||x>=s.start)&&(!s.end||x<=s.end));
+  const cs0=courseStart(s,gid),v=version(g,m),all=activeDates(g,m).filter(x=>(!cs0||x>=cs0)&&(!s.end||x<=s.end));
   const miss=(s.absent&&s.absent[gid])||[],d=all.filter(x=>!miss.includes(x));
   const r=calc(v.price,v.pack,d.length);
   return Object.assign(r,{n:d.length,price:v.price,pack:v.pack,all,miss,abs:all.length-d.length});
@@ -247,6 +247,10 @@ function tgSheet(sid){
   <div class="acts"><a class="btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(txt.replace(link,""))}" target="_blank" rel="noopener">Telegram</a>${ph?`<a class="btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none" href="https://wa.me/${ph}?text=${e}" target="_blank" rel="noopener">WhatsApp</a>`:""}</div>
   <button class="btn wide" onclick="stuSheet('${sid}')">Orqaga</button>`);
 }
+/* Kurs bo'yicha boshlagan sana: o'quvchi ikkinchi kursga oy o'rtasida yozilsa, shu kundan sanaladi */
+function courseStart(s,gid){const a=s.start||"",b=s.cstart&&s.cstart[gid]||"";return a>b?a:b}
+/* Chegirma tarixi: o'zgargan kundan keyin boshlanadigan to'lovlarga qo'llanadi */
+function discAt(s,gid,date){const L=s.dh&&s.dh[gid];if(!L||!L.length)return null;let p=null;for(const x of L.slice().sort((a,b)=>a.from<b.from?-1:1))if(x.from<=date)p=x.pct;return p}
 function famKey(s){return(s.family||"").trim().toLowerCase()}
 function discount(s,count,famCount,set){
   if(s.disc!==undefined&&s.disc!==null&&s.disc!=="")return{pct:+s.disc,why:"alohida"};
@@ -271,7 +275,7 @@ function cycles(sid,gid,m){
   if(!an)return baseCycles(sid,gid,m);
   const s=S.students[sid],g=S.groups[gid],key="z"+sid+"|"+gid+"|"+m;
   if(C[key])return C[key];
-  const st=s.start||trackFrom()+"-01",ac=baseCycles(an[0],an[1],m),out=[];
+  const st=courseStart(s,gid)||trackFrom()+"-01",ac=baseCycles(an[0],an[1],m),out=[];
   if(!ac.length)return C[key]=baseCycles(sid,gid,m);
   const own=[],last=ac[ac.length-1].next||ac[ac.length-1].last;
   for(let mm=st.slice(0,7);mm<=last.slice(0,7);mm=shift(mm,1)){
@@ -292,7 +296,7 @@ function cycles(sid,gid,m){
 function baseCycles(sid,gid,m){
   const s=S.students[sid],g=S.groups[gid],tm=today().slice(0,7),hz=shift(m>tm?m:tm,4),key="y"+sid+"|"+gid+"|"+hz;
   if(C[key])return C[key];
-  const st=s.start||trackFrom()+"-01",miss=(s.absent&&s.absent[gid])||[],dates=[];
+  const st=courseStart(s,gid)||trackFrom()+"-01",miss=(s.absent&&s.absent[gid])||[],dates=[];
   for(let mm=st.slice(0,7);mm<=hz;mm=shift(mm,1)){
     if(!(gid in stuCourses(s,mm)))continue;
     for(const d of activeDates(g,mm))if(d>=st&&(!s.end||d<=s.end))dates.push(d);
@@ -338,7 +342,8 @@ function rows(m){
     const g=S.groups[gid];if(!g)continue;
     const d=own!==null&&own!==undefined?{pct:+own,why:"kurs chegirmasi"}:discount(s,count[sid]||0,fam[famKey(s)]||0,set);
     const push=(b,ps,due)=>{const paid=ps.reduce((a,p)=>a+p.amount,0);
-      b.gross=b.total;b.pct=d.pct;b.why=d.why;b.disc=roundSum(b.gross*d.pct/100);b.total=b.gross-b.disc;
+      const hp=discAt(s,gid,b.cyc||m+"-01"),dd=hp===null?d:{pct:+hp,why:"kurs chegirmasi"};
+      b.gross=b.total;b.pct=dd.pct;b.why=dd.why;b.disc=roundSum(b.gross*dd.pct/100);b.total=b.gross-b.disc;
       out.push({sid,gid,s,g,b,m,paid,due,left:Math.max(0,b.total-paid),st:paid>=b.total?"paid":paid>0?"part":due?"debt":"soon"})};
     if(billMode()==="cycle"){
       const cs=cycles(sid,gid,m);
@@ -580,8 +585,10 @@ function grpAddSave(gid){
   if(!ids.length){toast("O'quvchini belgilang");return}
   for(const sid of ids){
     const old=S.students[sid],groups=Object.assign({},stuCourses(old,month),{[gid]:0});
+    const had=Object.keys(stuCourses(old,month)).filter(g=>S.groups[g]),ex={cstart:Object.assign({},old.cstart||{},{[gid]:today()})};
+    if(!old.anchor&&had.length&&billMode()==="cycle")ex.anchor=sid+"|"+had.sort((a,b)=>courseStart(old,a)<courseStart(old,b)?-1:1)[0];
     const base=old.versions&&old.versions.length?old.versions:[{from:"2000-01",groups:stuCourses(old,month)}];
-    put("students",sid,Object.assign({},old,{versions:[...base.filter(x=>x.from!==month),{from:month,groups}],groupIds:Object.keys(groups)}));
+    put("students",sid,Object.assign({},old,{versions:[...base.filter(x=>x.from!==month),{from:month,groups}],groupIds:Object.keys(groups)},ex));
   }
   closeSheet();toast(ids.length+" ta o'quvchi qo'shildi");
 }
@@ -726,7 +733,7 @@ let A={date:today(),g:""};
 function dshift(d,n){const[y,m,x]=d.split("-").map(Number),t=new Date(y,m-1,x+n);return t.getFullYear()+"-"+pad(t.getMonth()+1)+"-"+pad(t.getDate())}
 function dLabel(d){const[y,m,x]=d.split("-").map(Number);return WEEK[new Date(y,m-1,x).getDay()]+", "+x+" "+MONTHS[m-1].toLowerCase()}
 function groupsOn(d){const m=d.slice(0,7);return Object.entries(S.groups).filter(([,g])=>activeDates(g,m).includes(d)).sort((a,b)=>(a[1].time||"").localeCompare(b[1].time||"")||a[1].name.localeCompare(b[1].name))}
-function attList(gid,d){const m=d.slice(0,7);return Object.entries(S.students).filter(([,s])=>gid in stuCourses(s,m)&&(!s.start||d>=s.start)&&(!s.end||d<=s.end)).sort((a,b)=>a[1].name.localeCompare(b[1].name))}
+function attList(gid,d){const m=d.slice(0,7);return Object.entries(S.students).filter(([,s])=>gid in stuCourses(s,m)&&(!courseStart(s,gid)||d>=courseStart(s,gid))&&(!s.end||d<=s.end)).sort((a,b)=>a[1].name.localeCompare(b[1].name))}
 function isAbs(s,gid,d){return((s.absent&&s.absent[gid])||[]).includes(d)}
 function flipAbs(sid,gid,d){const s=S.students[sid],a=Object.assign({},s.absent||{}),c=new Set(a[gid]||[]);c.has(d)?c.delete(d):c.add(d);a[gid]=[...c];put("students",sid,Object.assign({},s,{absent:a}))}
 /* O'quvchining shu kursdagi davrlari: hozirgisi va keyingi to'lov kuni */
@@ -971,6 +978,7 @@ function stuSheet(id,leadId){
   <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} ${!own()&&s?"disabled":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">${s?"Kurs va chegirmani rahbar o'zgartiradi.":"Chegirmani rahbar belgilaydi."}</p>`}</div>
   ${s&&!s.end&&billMode()==="cycle"?(()=>{const L=Object.keys(cur).map(g=>[g,payInfo(id,g)]).filter(([,p])=>p);return L.length?`<div class="calc">${L.map(([g,p])=>`<div><span>${esc(S.groups[g].name)}${p.cur?`<br><span class="lbl">Hozirgi 12 dars: ${fmtD(p.cur.start)}–${fmtD(p.cur.last)}</span>`:""}</span><span style="text-align:right">${p.next?`To'lov kuni<br><b>${fullD(p.next)}</b>`:""}</span></div>`).join("")}</div>`:""})():""}
   ${s&&billMode()==="cycle"?anchorField(id,s):""}
+  ${s&&own()?`<label class="f">Yangi kurs yoki chegirma qaysi kundan<input id="scd" type="date" value="${today()}"></label><p class="note" style="margin-top:-6px">Yangi belgilangan kurs shu kundan sanaladi, o'zgargan chegirma shu kundan keyingi to'lovlarga qo'llanadi.</p>`:""}
   <div class="two"><label class="f">Boshlagan sana (birinchi darsi)<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
   ${s?`<p class="note">Kurs yoki chegirma o'zgarsa, ${mName(month)} oyidan boshlab qo'llanadi. Oldingi oylar o'zgarmaydi.</p>`:""}
   <div class="acts"><button class="btn" onclick="closeSheet()">Bekor qilish</button><button class="btn pri" id="ssave" onclick="saveStu(${s?`'${id}'`:""})">Saqlash</button></div>
@@ -1002,9 +1010,27 @@ function saveStu(id){
     const base=old.versions&&old.versions.length?old.versions:[{from:"2000-01",groups:stuCourses(old,month)}];
     versions=[...base.filter(x=>x.from!==month),{from:month,groups}];
   }
-  const newSid=id||uid();
+  const newSid=id||uid(),cd=(document.getElementById("scd")||{}).value||today();
+  const cstart=Object.assign({},old&&old.cstart||{}),dh=JSON.parse(JSON.stringify(old&&old.dh||{}));
+  if(old)for(const g of Object.keys(groups)){
+    if(!(g in prev)){cstart[g]=cd;dh[g]=[{from:cd,pct:groups[g]}];continue}
+    const was=discAt(old,g,cd),wasP=was===null?(+prev[g]||0):was;
+    if(+groups[g]!==wasP){if(!dh[g]||!dh[g].length)dh[g]=[{from:"2000-01-01",pct:+prev[g]||0}];dh[g]=dh[g].filter(x=>x.from!==cd);dh[g].push({from:cd,pct:+groups[g]})}
+  }
+  /* To'lov kunini bir kunga: ikkinchi kurs yoki aka-uka qo'shilsa, avtomatik birinchi kursning to'lov kuniga bog'lanadi */
+  let anchor=document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"";
+  if(!anchor&&billMode()==="cycle"){
+    const added=Object.keys(groups).filter(g=>!(g in prev)),had=Object.keys(prev).filter(g=>g in groups&&S.groups[g]);
+    if(old&&added.length&&had.length)anchor=id+"|"+had.sort((a,b)=>courseStart(old,a)<courseStart(old,b)?-1:1)[0];
+    else if(!old||!had.length){
+      const pk=phKey(document.getElementById("sp").value);
+      const sib=pk&&Object.entries(S.students).find(([x,o])=>x!==id&&!o.end&&phKey(o.phone)===pk&&Object.keys(stuCourses(o,month)).some(g=>S.groups[g]));
+      if(sib)anchor=sib[1].anchor||sib[0]+"|"+Object.keys(stuCourses(sib[1],month)).filter(g=>S.groups[g]).sort((a,b)=>courseStart(sib[1],a)<courseStart(sib[1],b)?-1:1)[0];
+      else if(Object.keys(groups).length>1)anchor=newSid+"|"+Object.keys(groups)[0];
+    }
+  }
   if(LEAD&&S.leads[LEAD]){put("leads",LEAD,Object.assign({},S.leads[LEAD],{status:"done",sid:newSid}));LEAD=null}
-  put("students",newSid,{...(old&&old.tg?{tg:old.tg}:{}),name,phone:document.getElementById("sp").value.trim(),phone2:document.getElementById("sp2").value.trim(),parent:document.getElementById("spn").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),anchor:document.getElementById("sa")?document.getElementById("sa").value:old&&old.anchor||"",family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
+  put("students",newSid,{...(old&&old.tg?{tg:old.tg}:{}),name,phone:document.getElementById("sp").value.trim(),phone2:document.getElementById("sp2").value.trim(),parent:document.getElementById("spn").value.trim(),start:document.getElementById("ss").value,end:document.getElementById("se").value,versions,groupIds:Object.keys(groups),cstart,dh,anchor,family:old?old.family||"":"",disc:old&&old.disc!==undefined?old.disc:""});
   closeSheet();
 }
 function setSheet(){
