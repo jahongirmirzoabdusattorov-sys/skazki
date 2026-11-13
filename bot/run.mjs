@@ -23,11 +23,14 @@ const api = async (method, body) => {
 
 // Ma'lumotlar: bir marta to'liq o'qiladi, keyin faqat o'zgarishlar keladi (Firestore o'qishlarini tejaydi)
 const COLS = ["groups", "students", "payments", "teachers", "salaries", "settings", "leads"];
-const data = {}; let dirtyPays = true;
+const data = {}; let dirtyPays = true; const voided = [];
 await Promise.all(COLS.map(c => new Promise(res => {
   data[c] = {}; let first = true;
   db.collection(c).onSnapshot(snap => {
-    snap.docChanges().forEach(ch => { if (ch.type === "removed") delete data[c][ch.doc.id]; else data[c][ch.doc.id] = ch.doc.data(); });
+    snap.docChanges().forEach(ch => {
+      if (ch.type === "removed") { const was = data[c][ch.doc.id]; if (c === "payments" && !first && was && was.tgSent) voided.push(was); delete data[c][ch.doc.id]; }
+      else data[c][ch.doc.id] = ch.doc.data();
+    });
     if (c === "payments" || c === "students") dirtyPays = true;
     if (first) { first = false; res(); }
   }, e => { console.log(c, "o'qish xatosi:", e.message); res(); });
@@ -99,6 +102,19 @@ async function receipts() {
   }
 }
 
+// Xato yozilib o'chirilgan to'lov: ota-onaga avval "qabul qilindi" borgan bo'lsa, tuzatish xabari
+async function corrections() {
+  while (voided.length) {
+    const p = voided.shift(), s = data.students[p.sid], g = data.groups[p.gid];
+    if (!s) continue;
+    const A = app(), pk = A.phKey(s.phone), chats = {};
+    for (const x of Object.values(data.students)) if (x === s || pk && A.phKey(x.phone) === pk) Object.assign(chats, x.tg || {});
+    const text = `Tuzatish: ${A.fullD(p.date)} kungi ${A.money(p.amount)} so'mlik to'lov (${s.name}${g ? `, "${g.name}"` : ""}) xato yozilgan edi va bekor qilindi. To'g'ri ma'lumot alohida xabarda keladi.${A.center() ? `\n\n${A.center()}` : ""}`;
+    for (const chat of Object.keys(chats)) await api("sendMessage", { chat_id: chat, text });
+    console.log("Tuzatish xabari:", s.name);
+  }
+}
+
 const dayRef = db.collection("botstate").doc("daily");
 async function daily() {
   const A = app(), today = A.today();
@@ -126,6 +142,7 @@ while (Date.now() - started < RUN_MS) {
     try { await handle(u); } catch (e) { console.log("Xabarni qayta ishlashda xato:", e.message); }
   }
   if (up.result && up.result.length) await stRef.set({ offset }, { merge: true });
+  try { await corrections(); } catch (e) { console.log("Tuzatish xabarida xato:", e.message); }
   try { await receipts(); } catch (e) { console.log("To'lov xabarida xato:", e.message); }
   if (Date.now() - lastDaily > 5 * 60e3) { lastDaily = Date.now(); try { await daily(); } catch (e) { console.log("Kunlik eslatmada xato:", e.message); } }
   if (!up.ok) await new Promise(r => setTimeout(r, 5000));
