@@ -560,6 +560,7 @@ async function copyDebt(b){
   const t=mName(month)+" holatiga qarzdorlar:\n"+L.map(({s,d})=>`${s.name}${s.phone?" ("+s.phone+")":""} | ${[...new Set(d.cur.concat(d.prev).filter(r=>r.left>0).map(r=>r.g.name))].join(", ")} | ${money(d.total)} so'm`).join("\n");
   try{await navigator.clipboard.writeText(t);toast("Ro'yxat nusxalandi")}catch(e){toast("Nusxalab bo'lmadi")}
 }
+const GOPEN=new Set();
 function grpView(){
   const L=Object.entries(S.groups).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const cards=L.map(([id,g])=>{
@@ -573,8 +574,7 @@ function grpView(){
     <div class="calc"><div><span>Oylik narx (${v.pack} dars)</span><span>${money(v.price)}</span></div>${r.extra?`<div><span>Qo'shimcha ${r.extra} dars</span><span>${money(r.total-v.price)}</span></div>`:""}<div class="t"><span>${mName(month)}: ${n} dars</span><span>${money(r.total)} so'm</span></div></div>
     <div class="lbl">${o?"Dars bo'lmagan kunni bosib bekor qiling:":"Dars kunlari (bekor qilinganlari qizil):"}</div>
     <div class="dates">${all.map(d=>`<button class="date ${c.includes(d)?"x":""}" aria-label="${d}" ${o?`onclick="toggleDay('${id}','${d}')"`:"disabled"}>${+d.slice(8)}</button>`).join("")}</div>
-    <div class="ghead" style="padding-top:2px"><h2>O'quvchilar</h2><span class="lbl">${cnt} nafar</span></div>
-    ${cnt?`<div class="list">${memH}</div>`:`<p class="note">Bu guruhda hali o'quvchi yo'q.</p>`}
+    ${cnt?`<button class="sublink" aria-expanded="${GOPEN.has(id)}" onclick="GOPEN.has('${id}')?GOPEN.delete('${id}'):GOPEN.add('${id}');render()" style="display:flex;justify-content:space-between;align-items:center"><span>O'quvchilar: ${cnt} nafar</span><span>${GOPEN.has(id)?"Yopish ▴":"Ro'yxat ▾"}</span></button>${GOPEN.has(id)?`<div class="list">${memH}</div>`:""}`:`<p class="note">Bu guruhda hali o'quvchi yo'q.</p>`}
     <button class="btn wide" onclick="grpAdd('${id}')">O'quvchi qo'shish</button></article>`}).join("");
   return monthBar()+(own()?`<button class="btn pri wide" onclick="grpSheet()">Guruh qo'shish</button>`:"")+(cards||`<div class="empty">Hali guruh yo'q.</div>`);
 }
