@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#0B6477">
 <title>Leadership Learning House — to'lovlar</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Nunito:wght@700;800;900&display=swap">
 <style>
 /* Layout: one-column ledger, month summary first, bottom tab bar */
 :root{
@@ -152,22 +152,88 @@ body.out{padding-bottom:0}
   #toast{bottom:24px}
 }
 #toast{position:fixed;left:16px;right:16px;bottom:76px;margin:auto;max-width:420px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;display:none;z-index:30;text-align:center}
+
+/* ===== Leadership Learning House ranglari: feruza + quyosh sariq ===== */
+:root{
+  --bg:#EEF6F6;--card:#FFFFFF;--ink:#12303A;--mute:#5B7279;--line:#D5E5E6;--accent:#0B6477;--on:#FFFFFF;
+  --sun:#F5B700;--sunink:#3D2B00;--sunbg:#FFF3C7;--teal2:#14919B;--tealbg:#DCF0F2;
+  --grad:linear-gradient(135deg,#0B6477 0%,#14919B 60%,#3FB6A8 100%);
+  --c1:#14919B;--c2:#F08A24;--c3:#7A5AF8;--c4:#E5487D;--c5:#2E9E5B;--c6:#F5B700;
+  --display:"Nunito","IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C1A1E;--card:#13272C;--ink:#E6F1F1;--mute:#9DB4B7;--line:#25404A;--accent:#5FD0D9;--on:#062A30;
+  --sun:#FFC933;--sunink:#2A1E00;--sunbg:#3A2F08;--teal2:#2FB3BC;--tealbg:#123A40;
+  --grad:linear-gradient(135deg,#0B4F5E 0%,#0F7480 60%,#1E8F84 100%);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1A1E;--card:#13272C;--ink:#E6F1F1;--mute:#9DB4B7;--line:#25404A;--accent:#5FD0D9;--on:#062A30;
+  --sun:#FFC933;--sunink:#2A1E00;--sunbg:#3A2F08;--teal2:#2FB3BC;--tealbg:#123A40;
+  --grad:linear-gradient(135deg,#0B4F5E 0%,#0F7480 60%,#1E8F84 100%);color-scheme:dark}
+body{background:var(--bg)}
+h1,h2,.month h1,.brand,#login h1,.sum .big{font-family:var(--display)}
+/* oy paneli: rangli lenta */
+.month{background:var(--grad);border-radius:16px;padding:8px;color:#fff;box-shadow:0 6px 18px -10px rgba(11,100,119,.7)}
+.month h1{color:#fff;letter-spacing:.2px}
+.month .icon{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.35);color:#fff}
+.month .icon:hover{background:rgba(255,255,255,.28)}
+/* kartalar */
+.sum,.card,.list,.calc,.whobar,.tb{border-radius:16px}
+.sum{position:relative;overflow:hidden;border:0;box-shadow:0 4px 16px -10px rgba(18,48,58,.35)}
+.sum::before{content:"";position:absolute;left:0;top:0;right:0;height:5px;background:linear-gradient(90deg,var(--sun),#F08A24,var(--teal2))}
+.sum .big{font-size:30px}
+.bar{height:8px;background:var(--tealbg)}
+.bar i{background:linear-gradient(90deg,var(--teal2),#2E9E5B)}
+.card{border:0;box-shadow:0 4px 16px -10px rgba(18,48,58,.35);border-top:5px solid var(--gc,var(--teal2))}
+.card h2{color:var(--gc-ink,var(--ink))}
+.list{box-shadow:0 2px 10px -8px rgba(18,48,58,.4)}
+/* tugmalar */
+.btn.pri{background:var(--grad);border:0;color:#fff;box-shadow:0 6px 14px -8px rgba(11,100,119,.8)}
+.btn.pri:hover{filter:brightness(1.07)}
+.seg button.on,.chip.on{background:var(--sun);border-color:var(--sun);color:var(--sunink)}
+.seg button{transition:background .15s}
+.seg button:hover{background:var(--sunbg)}
+.sublink{background:var(--tealbg);border-color:transparent}
+.pill.warn{background:var(--sunbg)}
+.whobar{background:var(--sunbg);border-color:transparent;color:var(--sunink)}
+.whobar b{color:var(--accent)}
+/* pastki menyu: ikonkalar */
+nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--accent);box-shadow:inset 0 3px 0 var(--sun)}
+nav button.on svg{stroke:var(--accent)}
+.crown{display:inline-block;width:22px;height:22px;vertical-align:-4px;margin-right:6px}
+/* kirish oynasi */
+#login{background:var(--grad)}
+#login form{border:0;box-shadow:0 20px 50px -20px rgba(0,0,0,.45)}
+#login h1{display:flex;flex-direction:column}
+@media (min-width:1024px){
+  nav{background:var(--grad);border-right:0;color:#fff}
+  .brand{color:#fff}
+  .brand span{color:rgba(255,255,255,.75)}
+  .who{color:var(--sun)}
+  nav button{flex-direction:row;justify-content:flex-start;gap:12px;color:rgba(255,255,255,.85);font-weight:600}
+  nav button:hover{background:rgba(255,255,255,.12)}
+  nav button.on{background:var(--sun);color:var(--sunink);box-shadow:0 6px 14px -8px rgba(0,0,0,.5)}
+  nav button.on svg{stroke:var(--sunink)}
+  .month{padding:10px 12px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body class="out">
 <main id="app"><p class="note">Yuklanmoqda…</p></main>
 <nav aria-label="Bo'limlar">
-  <div class="brand">O'quv markaz<span>To'lovlar va hisob</span><span id="whoNav" class="who"></span></div>
-  <button id="t-pay" onclick="go('pay')">To'lovlar</button>
-  <button id="t-led" onclick="go('led')">Qabul</button>
-  <button id="t-att" onclick="go('att')">Yo'qlama</button>
-  <button id="t-grp" onclick="go('grp')">Guruhlar</button>
-  <button id="t-stu" onclick="go('stu')">O'quvchilar</button>
-  <button id="t-tch" onclick="go('tch')">Ustozlar</button>
+  <div class="brand"><svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" fill="#F5B700" stroke="#C98F00" stroke-width="1.2" stroke-linejoin="round"/></svg>Leadership<span>Learning House · to'lovlar</span><span id="whoNav" class="who"></span></div>
+  <button id="t-pay" onclick="go('pay')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M7 15h3"/></svg>To'lovlar</button>
+  <button id="t-led" onclick="go('led')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M19 8v6M16 11h6"/></svg>Qabul</button>
+  <button id="t-att" onclick="go('att')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4z"/><path d="M8 3v4M16 3v4M4 10h16"/><path d="M9 15l2 2 4-4"/></svg>Yo'qlama</button>
+  <button id="t-grp" onclick="go('grp')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="3"/><circle cx="16.5" cy="9.5" r="2.5"/><path d="M2.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6"/><path d="M14 15c2.6-.6 5.6.6 6.5 4"/></svg>Guruhlar</button>
+  <button id="t-stu" onclick="go('stu')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4L2 9l10 5 10-5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/></svg>O'quvchilar</button>
+  <button id="t-tch" onclick="go('tch')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h12v9H4z"/><path d="M8 17l2-4M14 17l-2-4"/><circle cx="19" cy="9" r="2"/><path d="M17 20c.3-2.3 1-3.5 2-3.5s1.7 1.2 2 3.5"/></svg>Ustozlar</button>
 </nav>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 <div id="login" hidden><form onsubmit="return doLogin(event)" novalidate>
-  <h1>Leadership Learning House<span>To'lovlar va hisob</span></h1>
+  <h1><svg class="crown" style="width:40px;height:40px;margin:0 0 6px" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" fill="#F5B700" stroke="#C98F00" stroke-width="1.2" stroke-linejoin="round"/></svg>Leadership Learning House<span>To'lovlar va hisob</span></h1>
   <p class="note">Rahbar bergan email va parol bilan kiring.</p>
   <label class="f">Email<input id="auE" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
   <label class="f">Parol<input id="auP" type="password" autocomplete="current-password"></label>
@@ -628,7 +694,7 @@ function grpView(){
       return `<button class="row" onclick="stuSheet('${sid}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${cs?"boshlagan "+fmtD(cs):""}${p&&p.pay?` · to'lov kuni ${p.late?`<b style="color:var(--bad)">${fmtD(p.pay)} (o'tgan)</b>`:fmtD(p.pay)}`:""}${s.end?" · ketadi "+fmtD(s.end):""}${tgCount(s)?" · Telegram ✓":""}</div></div><div class="right">${dbt?`<span class="pill bad">qarz ${money(dbt)}</span>`:`<span class="pill good">qarz yo'q</span>`}</div></button>`}).join("");
     const r=calc(v.price,v.pack,n);
     const o=own();
-    return `<article class="card"><div class="top"><div><h2>${esc(g.name)}</h2><div class="lbl">${esc(dayNames(v.days))}${g.time?" · "+esc(g.time):""}${tName(g)?" · "+esc(tName(g)):""} · ${cnt} o'quvchi</div></div>${o?`<button class="btn" onclick="grpSheet('${id}')">Tahrirlash</button>`:""}</div>
+    return `<article class="card" style="--gc:var(--c${(L.findIndex(x=>x[0]===id)%6)+1})"><div class="top"><div><h2>${esc(g.name)}</h2><div class="lbl">${esc(dayNames(v.days))}${g.time?" · "+esc(g.time):""}${tName(g)?" · "+esc(tName(g)):""} · ${cnt} o'quvchi</div></div>${o?`<button class="btn" onclick="grpSheet('${id}')">Tahrirlash</button>`:""}</div>
     <div class="calc"><div><span>Oylik narx (${v.pack} dars)</span><span>${money(v.price)}</span></div>${r.extra?`<div><span>Qo'shimcha ${r.extra} dars</span><span>${money(r.total-v.price)}</span></div>`:""}<div class="t"><span>${mName(month)}: ${n} dars</span><span>${money(r.total)} so'm</span></div></div>
     <div class="lbl">${o?"Dars bo'lmagan kunni bosib bekor qiling:":"Dars kunlari (bekor qilinganlari qizil):"}</div>
     <div class="dates">${all.map(d=>`<button class="date ${c.includes(d)?"x":""}" aria-label="${d}" ${o?`onclick="toggleDay('${id}','${d}')"`:"disabled"}>${+d.slice(8)}</button>`).join("")}</div>
