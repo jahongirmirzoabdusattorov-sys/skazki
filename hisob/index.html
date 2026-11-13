@@ -567,7 +567,7 @@ function grpView(){
     const v=version(g,month),all=lessonDates(g,month),c=g.cancelled||[],n=all.filter(d=>!c.includes(d)).length;
     const mem=Object.entries(S.students).filter(([,s])=>id in stuCourses(s,month)&&!(s.end&&s.end<month+"-01")).sort((a,b)=>a[1].name.localeCompare(b[1].name)),cnt=mem.length;
     const memH=mem.map(([sid,s])=>{const H=courseHist(sid,id),dbt=H.filter(r=>r.due&&r.left>0&&r.m>=trackFrom()).reduce((a,r)=>a+r.left,0),p=payInfo(sid,id),cs=courseStart(s,id);
-      return `<button class="row" onclick="stuSheet('${sid}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${cs?"boshlagan "+fmtD(cs):""}${p&&p.next?" · to'lov kuni "+fmtD(p.next):""}${s.end?" · ketadi "+fmtD(s.end):""}${tgCount(s)?" · Telegram ✓":""}</div></div><div class="right">${dbt?`<span class="pill bad">qarz ${money(dbt)}</span>`:`<span class="pill good">qarz yo'q</span>`}</div></button>`}).join("");
+      return `<button class="row" onclick="stuSheet('${sid}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${cs?"boshlagan "+fmtD(cs):""}${p&&p.pay?` · to'lov kuni ${p.late?`<b style="color:var(--bad)">${fmtD(p.pay)} (o'tgan)</b>`:fmtD(p.pay)}`:""}${s.end?" · ketadi "+fmtD(s.end):""}${tgCount(s)?" · Telegram ✓":""}</div></div><div class="right">${dbt?`<span class="pill bad">qarz ${money(dbt)}</span>`:`<span class="pill good">qarz yo'q</span>`}</div></button>`}).join("");
     const r=calc(v.price,v.pack,n);
     const o=own();
     return `<article class="card"><div class="top"><div><h2>${esc(g.name)}</h2><div class="lbl">${esc(dayNames(v.days))}${g.time?" · "+esc(g.time):""}${tName(g)?" · "+esc(tName(g)):""} · ${cnt} o'quvchi</div></div>${o?`<button class="btn" onclick="grpSheet('${id}')">Tahrirlash</button>`:""}</div>
@@ -639,7 +639,7 @@ function stuView(){
   const L=Object.entries(S.students).sort((a,b)=>a[1].name.localeCompare(b[1].name));
   const list=L.map(([id,s])=>{
     const gn=Object.keys(stuCourses(s,month)).map(g=>S.groups[g]&&S.groups[g].name).filter(Boolean).join(", ");
-    const d=debt(id,month),nx=s.end?"":Object.keys(stuCourses(s,month)).map(g=>{const p=payInfo(id,g);return p&&p.next}).filter(Boolean).sort()[0];
+    const d=debt(id,month),nx=s.end?"":Object.keys(stuCourses(s,month)).map(g=>{const p=payInfo(id,g);return p&&p.pay}).filter(Boolean).sort()[0];
     return `<button class="row" onclick="stuSheet('${id}')"><div><div class="name">${esc(s.name)}</div><div class="lbl">${esc(gn||"Guruhsiz")}${s.family?" · "+esc(s.family):""}${s.end?" · ketgan":""}${nx?" · to'lov kuni "+fmtD(nx):""} · ${lastTxt(id)}</div></div><div class="right"><div class="val">${money(d.total)}</div><div class="lbl">${d.total?"qarz":"qarzi yo'q"}</div></div></button>`}).join("");
   return stuTabs()+monthBar()+`<button class="btn pri wide" onclick="stuSheet()">O'quvchi qo'shish</button><button class="btn wide" onclick="setSheet()">Sozlamalar va hisob</button>`+(list?`<div class="list">${list}</div>`:`<div class="empty">Hali o'quvchi yo'q.</div>`);
 }
@@ -752,7 +752,10 @@ function payInfo(sid,gid){
   if(billMode()!=="cycle"||!S.groups[gid])return null;
   const t=today(),cs=cycles(sid,gid,t.slice(0,7));if(!cs.length)return null;
   const cur=[...cs].reverse().find(c=>c.start<=t)||null,nx=cs.find(c=>c.start>t)||null;
-  return{cur,next:nx?nx.start:""};
+  /* To'lanmagan, muddati kelgan eng eski 12 talik bo'lsa, to'lov kuni o'sha (kechikkan) sana */
+  const ow=courseHist(sid,gid).find(r=>r.due&&r.left>0&&r.m>=trackFrom());
+  const owed=ow?{date:ow.b.cyc||ow.m+"-01",left:ow.left}:null;
+  return{cur,next:nx?nx.start:"",owed,pay:owed?owed.date:(nx?nx.start:""),late:!!owed};
 }
 function dueOn(gid,d){
   const out=[];
@@ -988,7 +991,7 @@ function stuSheet(id,leadId){
   <div class="two"><label class="f">Ota-ona telefoni<input id="sp" inputmode="tel" value="${esc(s?s.phone||"":pre?pre.phone||"":"")}"></label><label class="f">Qo'shimcha telefon<input id="sp2" inputmode="tel" value="${esc(s?s.phone2||"":"")}"></label></div>
   <label class="f">Ota-ona ismi<input id="spn" value="${esc(s?s.parent||"":"")}"></label>
   <div><div class="lbl" style="margin-bottom:6px">${own()?"Kurslari va chegirmasi":"Kurslari"}</div>${L.length?`<div class="list" id="sg">${L.map(([g,o])=>{const on=g in cur,v=version(o,month);return `<div class="course"><label class="check"><input type="checkbox" value="${g}" ${on?"checked":""} ${!own()&&s?"disabled":""} onchange="togC(this)"><span>${esc(o.name)}<br><span class="lbl">${money(v.price)} so'm · ${esc(dayNames(v.days))}${o.time?" · "+esc(o.time):""}</span></span></label>${own()?`<div class="sub" style="display:${on?"flex":"none"}"><label>Chegirma (%)<input data-g="${g}" inputmode="decimal" placeholder="0" value="${pctOf(g)}"></label></div>`:""}</div>`}).join("")}</div>`:`<p class="note">${own()?"Avval guruh qo'shing.":"Hali guruh yo'q. Guruhni rahbar qo'shadi."}</p>`}${own()?"":`<p class="note">${s?"Kurs va chegirmani rahbar o'zgartiradi.":"Chegirmani rahbar belgilaydi."}</p>`}</div>
-  ${s&&!s.end&&billMode()==="cycle"?(()=>{const L=Object.keys(cur).map(g=>[g,payInfo(id,g)]).filter(([,p])=>p);return L.length?`<div class="calc">${L.map(([g,p])=>`<div><span>${esc(S.groups[g].name)}${p.cur?`<br><span class="lbl">Hozirgi 12 dars: ${fmtD(p.cur.start)}–${fmtD(p.cur.last)}</span>`:""}</span><span style="text-align:right">${p.next?`To'lov kuni<br><b>${fullD(p.next)}</b>`:""}</span></div>`).join("")}</div>`:""})():""}
+  ${s&&!s.end&&billMode()==="cycle"?(()=>{const L=Object.keys(cur).map(g=>[g,payInfo(id,g)]).filter(([,p])=>p);return L.length?`<div class="calc">${L.map(([g,p])=>`<div><span>${esc(S.groups[g].name)}${p.cur?`<br><span class="lbl">Hozirgi 12 dars: ${fmtD(p.cur.start)}–${fmtD(p.cur.last)}</span>`:""}</span><span style="text-align:right">${p.late?`To'lov kuni o'tgan<br><b style="color:var(--bad)">${fullD(p.owed.date)}</b><br><span class="lbl">qarz ${money(p.owed.left)}${p.next?`, keyingisi ${fmtD(p.next)}`:""}</span>`:p.next?`To'lov kuni<br><b>${fullD(p.next)}</b>`:""}</span></div>`).join("")}</div>`:""})():""}
   ${s&&billMode()==="cycle"?anchorField(id,s):""}
   ${s&&own()?`<label class="f">Yangi kurs yoki chegirma qaysi kundan<input id="scd" type="date" value="${today()}"></label><p class="note" style="margin-top:-6px">Yangi belgilangan kurs shu kundan sanaladi, o'zgargan chegirma shu kundan keyingi to'lovlarga qo'llanadi.</p>`:""}
   <div class="two"><label class="f">Boshlagan sana (birinchi darsi)<input id="ss" type="date" value="${esc(s?s.start||"":today())}"></label><label class="f">Ketgan sana<input id="se" type="date" value="${esc(s?s.end||"":"")}"></label></div>
