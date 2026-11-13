@@ -42,6 +42,7 @@ button{cursor:pointer}
 .stp{display:flex;gap:4px}
 .stp button{flex:none;width:40px;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:18px}
 .course .sub .stp input{flex:1;min-width:0;text-align:center;padding:0 2px}
+.sheet>*{flex-shrink:0}
 .tb{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;min-width:560px}
 .tb th{font-size:12px;color:var(--mute);font-weight:600;text-align:left;padding:8px;border-bottom:1px solid var(--line)}
 .tb td{padding:8px;border-top:1px solid var(--line);vertical-align:top}
@@ -801,6 +802,7 @@ function courseSheet(sid,gid){
   const unpaid=H.filter(r=>r.left>0&&r.m>=trackFrom()),firstLeft=unpaid.length?unpaid[0].left:0;
   openSheet(`<h2>${esc(s.name)}: ${esc(g.name)}</h2><p class="note">12 taliklar jadvali. Qatorni bossangiz, o'sha davr ochiladi.</p>
   <div style="overflow-x:auto"><table class="tb"><thead><tr><th>№</th><th>Davr</th><th>To'lash kerak edi</th><th>Summa</th><th>To'langan sana</th><th>Holat</th></tr></thead><tbody>${body||`<tr><td colspan="6">Hali davr yo'q</td></tr>`}</tbody></table></div>
+  ${(()=>{const all=Object.entries(S.payments).filter(([,p])=>p.sid===sid&&p.gid===gid).sort((a,b)=>a[1].date<b[1].date?1:-1);return `<div class="ghead"><h2>Yozilgan to'lovlar</h2><span class="lbl">${all.length} ta</span></div>`+(all.length?`<div class="list">${all.map(([pid,p])=>`<div class="row"><div><div class="val">${money(p.amount)} so'm</div><div class="lbl">${fullD(p.date)} · ${esc(p.method||"")}</div></div>${own()?`<button class="btn del" onclick="armDelete(this,()=>{del('payments','${pid}');courseSheet('${sid}','${gid}')})">O'chirish</button>`:""}</div>`).join("")}</div>`:`<p class="note">Bu kursga hali to'lov yozilmagan.</p>`)})()}
   <div class="ghead"><h2>To'lov yozish</h2></div>
   <label class="f">Bergan puli<input id="ca" inputmode="numeric" value="${firstLeft?money(firstLeft):""}" oninput="fmtMoney(this)"></label>
   <div class="two"><label class="f">To'lagan sana<input id="cd" type="date" value="${t}"></label><label class="f">Usul<select id="cm"><option>Naqd</option><option>Karta</option><option>O'tkazma</option></select></label></div>
