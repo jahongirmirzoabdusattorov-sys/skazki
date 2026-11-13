@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#33B4C0">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Мишутка">
 <title>Русский с Мишуткой — игра</title>
 <meta name="description" content="Игра для детей 5–7 лет: 12 месяцев подготовки к олимпиаде «Русский медвежонок» вместе с Мишуткой. Буквы, слоги, слова, предложения, загадки и пробная олимпиада.">
 <meta property="og:type" content="website">
@@ -1065,5 +1069,6 @@ function openGate(mi){go();if(mi!=null){const b=S.tests[mi-1]||0;
 if(SITE){try{const P=new URLSearchParams(location.search),k=P.get('kod');if(k!==null){P.delete('kod');const qs=P.toString();history.replaceState(null,'',location.pathname+(qs?'?'+qs:'')+location.hash);if(!full)tryCode(k).catch(()=>{})}}catch(e){}}
 openHome();
 </script>
+<script>try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){})}catch(e){}</script>
 </body>
 </html>
